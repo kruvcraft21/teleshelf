@@ -14,12 +14,27 @@ class LogSettings:
     format: str
 
 @dataclass
+class DatabaseSettings:
+    host: str
+    port: int
+    database: str
+    username: str
+    password: str
+
+@dataclass
 class Config:
     bot: TgBot
     log: LogSettings
+    database: DatabaseSettings
 
 def load_config(path: str | None = None) -> Config:
     return Config(
         bot=TgBot(token=os.getenv("BOT_TOKEN", "")),
-        log=LogSettings(level=os.getenv("LOG_LEVEL", ""), format=os.getenv("LOG_FORMAT", "")),
+        log=LogSettings(level=os.getenv("LOG_LEVEL", ""),
+                        format=os.getenv("LOG_FORMAT", "")),
+        database=DatabaseSettings(host=os.getenv("POSTGRES_HOST", ""),
+                                  port=int(os.getenv("POSTGRES_PORT", "5432")),
+                                  database=os.getenv("POSTGRES_DB", ""),
+                                  username=os.getenv("POSTGRES_USER", ""),
+                                  password=os.getenv("POSTGRES_PASSWORD", ""),)
     )
