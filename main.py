@@ -1,63 +1,47 @@
-from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart, Command
-from aiogram.types import (
-    KeyboardButton,
-    KeyboardButtonRequestChat,
-    Message,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
-)
+from aiogram import Bot, Dispatcher
 
 from config import load_config, Config
-from handlers import chats
+from handlers.chats import chats_router
+from database.db import Database
 
 import logging
 import asyncio
 
 logger = logging.getLogger(__name__)
-config: Config = load_config()
-logging.basicConfig(
-    level=logging.getLevelName(level=config.log.level),
-    format=config.log.format,
-)
 
-logger.info("Starting bot")
-bot = Bot(token=config.bot.token)
-dp = Dispatcher()
-# bot.delete_webhook(drop_pending_updates=True)
+async def main():
+    # Загружаем конфиг в переменную config
+    config: Config = load_config()
 
-button = KeyboardButton(
-    text="Выбрать чат",
-    request_chat=KeyboardButtonRequestChat(
-        request_id=111,
-        chat_is_channel=False,
+    # Задаём базовую конфигурацию логирования
+    logging.basicConfig(
+        level=logging.getLevelName(level=config.log.level),
+        format=config.log.format,
     )
-)
+    # Выводим в консоль информацию о начале запуска бота
+    logger.info("Starting bot")
 
-keyboard = ReplyKeyboardMarkup(keyboard=[[button]])
-dp.include_router(chats.chats_router)
+    # Инициализируем бот и диспетчер
+    bot = Bot(
+        token=config.bot.token,
+    )
+    dp = Dispatcher()
 
+    # Инициализируем "базу данных"
+    db = await Database.create(config.database)
 
-@dp.message(CommandStart())
-async def start_command(message: Message):
-    await message.answer("Выберете чат", reply_markup=keyboard)
+    # Сохраняем готовую книгу и "базу данных" в \`workflow_data\`
+    dp.workflow_data.update(db=db)
 
-@dp.message(Command(commands=['clear']))
-async def clear_command(message: Message):
-    await message.answer("Клавиатура убрана", reply_markup=ReplyKeyboardRemove())
+    # Регистрируем роутеры в диспетчере
+    dp.include_router(chats_router)
 
-@dp.message(F.chat_shared)
-async def chat_check(message: Message):
-    logger.info(message.model_dump_json(indent=4, exclude_none=True))
-
-# @dp.message()
-# async def text_check(message: Message):
-#     logger.info(message.model_dump_json(indent=4, exclude_none=True))
-
-
+    # Пропускаем накопившиеся апдейты и запускаем polling
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    dp.run_polling(bot)
+    asyncio.run(main())
 
 
 # async def main():
