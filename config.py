@@ -22,10 +22,17 @@ class DatabaseSettings:
     password: str
 
 @dataclass
+class TgApiServer:
+    api_id: int
+    api_hash: str
+
+
+@dataclass
 class Config:
     bot: TgBot
     log: LogSettings
     database: DatabaseSettings
+    tg_api: TgApiServer
 
 def load_config(path: str | None = None) -> Config:
     return Config(
@@ -36,5 +43,7 @@ def load_config(path: str | None = None) -> Config:
                                   port=int(os.getenv("POSTGRES_PORT", "5432")),
                                   database=os.getenv("POSTGRES_DB", ""),
                                   username=os.getenv("POSTGRES_USER", ""),
-                                  password=os.getenv("POSTGRES_PASSWORD", ""),)
+                                  password=os.getenv("POSTGRES_PASSWORD", ""),),
+        tg_api=TgApiServer(api_id=int(os.getenv("TELEGRAM_API_ID", "0")),
+                           api_hash=os.getenv("TELEGRAM_API_HASH", ""),)
     )
