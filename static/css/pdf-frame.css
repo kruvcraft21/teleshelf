@@ -1,9 +1,9 @@
 #pdfFrame {
     position: absolute;
-    top: 52px;
+    top: 0;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: 52px;
     width: 100%;
     height: calc(100% - 52px);
     border: none;
@@ -11,7 +11,7 @@
 }
 
 #pdfFrame.status-hidden {
-    top: 0;
+    bottom: 0;
     height: 100%;
-    transition: top 240ms ease, height 240ms ease;
+    transition: bottom 240ms ease, height 240ms ease;
 }
