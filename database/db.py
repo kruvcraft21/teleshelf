@@ -146,6 +146,14 @@ class Database:
                 result = str(topic.title)
         return result
 
+    async def get_file_tg_id(self, file_id: int) -> str:
+        result = ""
+        async with self._session() as session:
+            file = await session.get(File, file_id)
+            if file is not None:
+                result = str(file.tg_file_id)
+        return result
+
 if __name__ == "__main__":
     from config import load_config
     import asyncio
