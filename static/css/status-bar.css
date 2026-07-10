@@ -1,0 +1,57 @@
+#statusBar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    background: #1f1f1f;
+    color: white;
+    font-size: 14px;
+    z-index: 10;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+#statusBar.hidden {
+    transform: translateY(-100%);
+    transition:
+        transform 240ms ease,
+        visibility 0s linear 240ms;
+}
+
+.icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.check {
+    display: none;
+    font-size: 14px;
+    color: #4ade80;
+    font-weight: bold;
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: white;
+    box-sizing: border-box;
+    border-radius: 50%; /* Если хотите сделать элемент идеальным кругом */
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
