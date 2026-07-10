@@ -1,5 +1,3 @@
-// const pdfUrl = "{{ pdf_url }}";
-
 const frame = document.getElementById("pdfFrame");
 const statusBar = document.getElementById("statusBar");
 const statusText = document.getElementById("statusText");
@@ -8,6 +6,9 @@ const spinner = document.getElementById("spinner");
 const check = document.getElementById("check");
 
 const pdfUrl = frame.dataset.pdf_url
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+const ver = urlParams.get('v')
 
 function setLoading(text) {
     spinner.style.display = "block";
@@ -44,7 +45,7 @@ frame.onload = () => {
         const iframeDoc = frame.contentDocument || frame.contentWindow.document;
         const linkTag = iframeDoc.createElement('link');
         linkTag.rel = 'stylesheet';
-        linkTag.href = '/static/css/toolbar.css';
+        linkTag.href = `/static/css/toolbar.css?v=${ver}`;
         iframeDoc.head.appendChild(linkTag);
         const viewerApp = frame.contentWindow.PDFViewerApplication;
         if (viewerApp) {

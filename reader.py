@@ -13,6 +13,7 @@ from rich import inspect
 
 from dotenv import load_dotenv
 import os
+import uuid
 
 load_dotenv()
 
@@ -48,7 +49,8 @@ async def reader_page(request: Request, file_id: str):
         request=request,
         name="reader.html",
         context={
-            "pdf_url": f"/api/pdf/{file_id}"
+            "pdf_url": f"/api/pdf/{file_id}",
+            "ver": str(uuid.uuid4()),
         },
         headers=headers,
     )
