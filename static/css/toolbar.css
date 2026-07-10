@@ -81,33 +81,26 @@
 
 .doorHanger,
 .doorHangerRight {
-    inset-block-start: auto;
-    inset-block-end: calc(100% + var(--doorhanger-height) - 2px);
+    position: fixed !important;
+    top: auto !important;
+    bottom: calc(100% + 12px) !important;
+
+    &::after,
+    &::before {
+        content: none;
+    }
 }
 
-.doorHanger::after,
-.doorHanger::before,
-.doorHangerRight::after,
-.doorHangerRight::before {
-    top: 100%;
-    bottom: auto;
+.doorHangerRight {
+    right: 0 !important;
+    left: auto !important;
 }
 
-.doorHanger::before,
-.doorHangerRight::before {
-    border-top-color: var(--doorhanger-border-color);
-    border-bottom-color: transparent;
+.doorHanger {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
 }
 
-.doorHanger::after {
-    border-top-color: var(--toolbar-glass-bg-color);
-    border-bottom-color: transparent;
-}
-
-.doorHangerRight::after {
-    border-top-color: var(--doorhanger-bg-color);
-    border-bottom-color: transparent;
-}
 
 @media all and (max-width: 900px) {
     #toolbarContainer {
