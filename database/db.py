@@ -112,6 +112,9 @@ class Database:
                 result = str(file.tg_file_id)
         return result
 
+    async def close(self):
+        await self._engine.dispose()
+
 if __name__ == "__main__":
     from config import load_config
     import asyncio
