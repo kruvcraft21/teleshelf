@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 import logging
-from hydrogram import Client
-from fastapi import FastAPI, Request
+
+from clients.hydroclient import HydroClient
+from fastapi import FastAPI, Request, APIRouter
 from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -35,7 +36,10 @@ logger.info(f"BASE_DIR: {BASE_DIR}")
 # FastAPI приложение
 reader = APIRouter()
 templates = Jinja2Templates(directory="templates")
-reader.mount("/static", StaticFiles(directory="static"), name="static")
+reader.mount("/css", StaticFiles(directory="static/css"), name="css")
+reader.mount("/js", StaticFiles(directory="static/js"), name="js")
+reader.mount("/pdfjs", StaticFiles(directory="static/pdfjs"), name="pdfjs")
+
 @reader.get("/", response_class=HTMLResponse)
 async def reader_page(request: Request, file_id: str):
     """Страница читалки"""
@@ -51,6 +55,7 @@ async def reader_page(request: Request, file_id: str):
         context={
             "pdf_url": f"/api/pdf/{file_id}",
             "ver": str(uuid.uuid4()),
+            "level_debug": str(config.log.level)
         },
         headers=headers,
     )

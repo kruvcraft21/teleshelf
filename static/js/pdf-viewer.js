@@ -36,7 +36,7 @@ function setError(text) {
 setLoading("Загрузка PDF-просмотрщика...");
 
 // Корректный путь с учетом статики FastAPI
-const viewerUrl = `/static/pdfjs/web/viewer.html?file=${encodeURIComponent(pdfUrl)}`;
+const viewerUrl = `/pdfjs/web/viewer.html?file=${encodeURIComponent(pdfUrl)}`;
 frame.src = viewerUrl;
 
 
@@ -45,7 +45,7 @@ frame.onload = () => {
         const iframeDoc = frame.contentDocument || frame.contentWindow.document;
         const linkTag = iframeDoc.createElement('link');
         linkTag.rel = 'stylesheet';
-        linkTag.href = `/static/css/toolbar.css?v=${ver}`;
+        linkTag.href = `/css/toolbar.css?v=${ver}`;
         iframeDoc.head.appendChild(linkTag);
         const viewerApp = frame.contentWindow.PDFViewerApplication;
         if (viewerApp) {
