@@ -33,7 +33,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 logger.info(f"BASE_DIR: {BASE_DIR}")
 
 # FastAPI приложение
-reader = FastAPI()
+reader = APIRouter()
 templates = Jinja2Templates(directory="templates")
 reader.mount("/static", StaticFiles(directory="static"), name="static")
 @reader.get("/", response_class=HTMLResponse)
@@ -59,7 +59,19 @@ async def reader_page(request: Request, file_id: str):
 async def get_pdf(request: Request, file_id: str) -> AsyncIterator[bytes]:
     """Стриминг PDF из Telegram"""
     
-    bot = reader.state.bot
+    bot = request.app.state.bot
 
     async for chunk in bot.stream_media(file_id):
         yield chunk
+
+@asynccontextmanager
+async def lifespan(fast_app: FastAPI):
+    bot = await HydroClient.start(name='tg_reader', api_id=config.tg_api.api_id, api_hash=config.tg_api.api_hash,
+                       bot_token=config.bot.token)
+    fast_app.state.bot = bot
+    yield
+    await fast_app.state.bot.stop()
+
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(reader)
