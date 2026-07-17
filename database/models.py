@@ -41,6 +41,6 @@ class Position(Base):
 
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     file_id: Mapped[int] = mapped_column(Integer, ForeignKey('files.id', ondelete='CASCADE'), primary_key=True)
-    page: Mapped[int] = mapped_column(Integer)
+    page: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     file: Mapped["File"] = relationship(back_populates="positions")
