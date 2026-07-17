@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres
+    image: postgres:18.4-trixie
     restart: always
     volumes:
       - ./postgres_debug:/var/lib/postgresql
@@ -11,7 +11,15 @@ services:
       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
 
   adminer:
-    image: adminer
+    image: adminer:5.4.2-standalone
     restart: always
     ports:
       - "8080:8080"
+
+  redis:
+    image: redis:8.8.0-trixie
+    restart: always
+    volumes:
+      - ./redis_data:/data
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"

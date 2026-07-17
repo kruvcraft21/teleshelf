@@ -242,6 +242,7 @@ cython_debug/
 .idea/
 
 /postgres_debug/
+/redis_data/
 
 *.session
 *.session-shm
