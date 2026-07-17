@@ -74,12 +74,12 @@ class Database:
 
     async def try_add_file(self, file_id: str, topic_id: int, caption: str | None) -> None:
         async with self._session.begin() as session:
-            chat = await session.get(Topic, topic_id)
-            if chat is not None:
-                files: list[File] = await chat.awaitable_attrs.files
-                if not any(file.tg_file_id == file_id for file in files):
-                    new_file_in_topic = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[])
-                    files.append(new_file_in_topic)
+            stmt = select(File.id).where(File.topic_id == topic_id,
+                                         File.tg_file_id == file_id)
+            file = await session.scalar(stmt)
+            if file is None:
+                new_file = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[])
+                session.add(new_file)
 
     async def get_chats(self, user_id: int) -> dict[str, int]:
         result = {}
@@ -93,11 +93,10 @@ class Database:
     async def get_files(self, topic_id: int) -> dict[str, int]:
         result = {}
         async with self._session() as session:
-            topic = await session.get(Topic, topic_id)
-            if topic is not None:
-                files = await topic.awaitable_attrs.files
-                for file in files:
-                    result[file.caption] = file.id
+            stmt = select(File.id, File.caption).where(File.topic_id == topic_id)
+            rows = await session.execute(stmt)
+            for file_id, file_caption in rows:
+                result[file_caption] = file_id
         return result
 
     async def get_topic_title(self, topic_id: int) -> str:
