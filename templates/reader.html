@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for("css", path="main.css") }}?v={{ ver }}">
     <link rel="stylesheet" href="{{ url_for("css", path="status-bar.css") }}?v={{ ver }}">
     <link rel="stylesheet" href="{{ url_for("css", path="pdf-frame.css") }}?v={{ ver }}">
+    <script src="{{ url_for("js", path="webapp-worker.js") }}?v={{ ver }}"></script>
 </head>
 
 <body>
@@ -23,7 +24,6 @@
     </iframe>
 
     <script src="{{ url_for("js", path="pdf-viewer.js") }}?v={{ ver }}"></script>
-    <script src="{{ url_for("js", path="webapp-worker.js") }}?v={{ ver }}"></script>
     {%if level_debug in ['INFO', 'DEBUG'] -%}
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
     <script>eruda.init();</script>
