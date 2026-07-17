@@ -1,22 +1,25 @@
 import logging
 from typing import Any
 
-from config import DatabaseSettings
+from config import PGDatabseSettings, RedisSettings
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
 from sqlalchemy import URL, select
 
-from database.models import Base, UserChats, Topic, File
+from database.models import Base, UserChats, Topic, File, Position
+
+from database.redis_wrapper import RedisWrapper
 
 
 class Database:
-    def __init__(self, engin : AsyncEngine, session_maker : async_sessionmaker[AsyncSession | Any], logger: logging.Logger):
+    def __init__(self, engin : AsyncEngine, session_maker : async_sessionmaker[AsyncSession | Any], logger: logging.Logger, redis : RedisWrapper):
         self._engine = engin
         self._session = session_maker
         self.logger = logger
+        self.redis = redis
 
     @classmethod
-    async def create(cls, db_settings: DatabaseSettings):
+    async def create(cls, db_settings: PGDatabseSettings, redis_settings: RedisSettings):
         # self = cls()
         logger = logging.getLogger(__name__)
         logger.info(f"Пытаемся подключится")
@@ -40,7 +43,8 @@ class Database:
             expire_on_commit=False,
             autoflush=False,
         )
-        self = cls(_engine, session_maker=_session, logger=logger)
+        redis = await RedisWrapper.get_redis_client(redis_settings)
+        self = cls(_engine, session_maker=_session, logger=logger, redis=redis)
         self.logger.info("Автоматическое создание таблиц при инициализации базы...")
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -104,16 +108,34 @@ class Database:
                 result = str(topic.title)
         return result
 
-    async def get_file_tg_id(self, file_id: int) -> str:
+    async def get_file_tg_id(self, session_id: str) -> str:
+        return await self.redis.get_tg_file_id(session_id)
+
+    async def create_session(self, file_id: int, user_id: int) -> str :
         result = ""
-        async with self._session() as session:
-            file = await session.get(File, file_id)
-            if file is not None:
-                result = str(file.tg_file_id)
+        async with self._session.begin() as session:
+            position = await session.scalar(select(Position).where(Position.user_id == user_id,
+                                                                   Position.file_id == file_id))
+            tg_file_id = await session.scalar(select(File.tg_file_id).where(File.id == file_id))
+            if tg_file_id is not None:
+                if position is None:
+                    position = Position(user_id=user_id, file_id=file_id, page=0)
+                    session.add(position)
+                result = await self.redis.try_create_session(position, tg_file_id=tg_file_id)
         return result
+
+    async def get_page(self, session_id: str) -> int:
+        if len(session_id) > 0:
+            return await self.redis.get_page(session_id)
+        return 0
+
+    async def update_page(self, session_id: str, page: int) -> None:
+        if len(session_id) > 0:
+            await self.redis.update_page(session_id, page)
 
     async def close(self):
         await self._engine.dispose()
+        await self.redis.close()
 
 if __name__ == "__main__":
     from config import load_config

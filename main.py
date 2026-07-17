@@ -33,7 +33,8 @@ async def start_app():
     bot = Bot(
         token=config.bot.token,
     )
-    dp = Dispatcher()
+    db = await Database.create(config.database, config.redis)
+    dp = Dispatcher(storage=RedisStorage(db.redis.redis, data_ttl=300, state_ttl=300))
     dp.include_router(chats_router)
     dp.include_router(user_router)
     if config.log.level in ["DEBUG", "INFO"]:
@@ -42,7 +43,7 @@ async def start_app():
     await bot.delete_webhook(drop_pending_updates=True)
 
     hy_client = await HydroClient.start(name="tg_reader",api_id=config.tg_api.api_id, api_hash=config.tg_api.api_hash, bot_token=config.bot.token)
-    db = await Database.create(config.database)
+
     return hy_client, db, bot, dp
 
 async def stop_app(client: HydroClient, db: Database):
@@ -54,6 +55,7 @@ async def stop_app(client: HydroClient, db: Database):
 async def lifespan(fast_app: FastAPI):
     hy_client, db, bot, dp = await start_app()
     fast_app.state.bot = hy_client
+    fast_app.state.db = db
     fast_app.state.polling_task = asyncio.create_task(dp.start_polling(bot, db=db, hy_client=hy_client, handle_signals=False))
     yield
     logger.info("Shutting down bot")
