@@ -57,6 +57,16 @@ frame.onload = () => {
                 viewerApp.eventBus.on("pagesinit", () => {
                     setReady("Документ открыт");
                 });
+                viewerApp.eventBus.on("pagechanging", (event) => {
+                    const page = event.pageNumber
+                    const response = fetch(`api/pdf/update_position/${session_id}`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ page: page })
+                    })
+                });
             });
         }
     } catch (error) {
