@@ -20,7 +20,9 @@
         <span id="statusText">Подготовка документа...</span>
     </div>
     <iframe id="pdfFrame"
-            data-pdf_url="{{ pdf_url }}">
+            data-session_id="{{ session_id }}"
+            data-page="{{ page }}"
+    >
     </iframe>
 
     <script src="{{ url_for("js", path="pdf-viewer.js") }}?v={{ ver }}"></script>

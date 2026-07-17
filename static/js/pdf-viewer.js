@@ -5,7 +5,8 @@ const statusText = document.getElementById("statusText");
 const spinner = document.getElementById("spinner");
 const check = document.getElementById("check");
 
-const pdfUrl = frame.dataset.pdf_url
+const session_id = frame.dataset.session_id
+const current_page = frame.dataset.page
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 const ver = urlParams.get('v')
@@ -36,7 +37,9 @@ function setError(text) {
 setLoading("Загрузка PDF-просмотрщика...");
 
 // Корректный путь с учетом статики FastAPI
-const viewerUrl = `/pdfjs/web/viewer.html?file=${encodeURIComponent(pdfUrl)}`;
+const pdfUrl = `/api/pdf/${session_id}`;
+const path_to_file = session_id.length > 0 ? `file=${encodeURIComponent(pdfUrl)}#page=${current_page}` : "";
+const viewerUrl = `/pdfjs/web/viewer.html?${path_to_file}`;
 frame.src = viewerUrl;
 
 

@@ -1,69 +1,87 @@
-from aiogram import Router, F
-from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery
+from aiogram import Router, F, Bot
+from aiogram.filters import CommandStart, Command, StateFilter
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from database.db import Database
-from keyboards.pagination_maker import pagination_maker, calculate_pagination, build_navigation_buttons, MAX_BUTTONS
-from callbacks.pagination import TopicsPagination, FilesPagination
-from callbacks.collection_worker import Topic, File
+from keyboards.pagination_maker import is_navigation, render_keyboard
+from callbacks.pagination import PaginationButton
+
+from callbacks.reader_state import ReaderState
+from aiogram.fsm.context import FSMContext
+
+import logging
+import os
 
 user_router = Router()
 
+logger = logging.getLogger(__name__)
+
 @user_router.message(CommandStart(), F.from_user)
-async def start(message: Message, db: Database):
+async def start(message: Message, db: Database, state: FSMContext):
     user_id = message.from_user.id
     chats = await db.get_chats(user_id)
     if len(chats) == 0:
         await message.answer("Увы нет чатов")
         return
-    buttons_topics = [(chat, Topic(topic_id=chats[chat]).pack()) for chat in chats.keys()]
-    navigation = build_navigation_buttons(1, TopicsPagination)
-    keyboard = pagination_maker(result_search=buttons_topics[:MAX_BUTTONS], navigation=navigation)
-    await message.answer("Вот ваша коллекция чатов", reply_markup=keyboard)
+    await state.set_state(ReaderState.choose_topic)
+    await render_keyboard(buttons=list(chats.keys()),
+                          event=message,
+                          message="Вот ваша коллекция чатов",
+                          current_page=1,
+                          next_step=0)
 
-@user_router.callback_query(TopicsPagination.filter())
-async def topics_pagination(callback_query: CallbackQuery, db: Database, callback_data: TopicsPagination):
+@user_router.callback_query(StateFilter(ReaderState.choose_topic), PaginationButton.filter())
+async def choose_topic(callback_query: CallbackQuery, state: FSMContext, db: Database, callback_data: PaginationButton):
     user_id = callback_query.from_user.id
     chats = await db.get_chats(user_id)
-    buttons_topics = [(chat, Topic(topic_id=chats[chat]).pack()) for chat in chats.keys()]
-    paginated = calculate_pagination(buttons_topics, callback_data.current_page, callback_data.next_step)
-    if not paginated:
-        await callback_query.answer("Дальше уже некуда")
-        return
+    chats_list = list(chats.keys())
+    if is_navigation(callback_data) or callback_data.index > len(chats_list):
+        await render_keyboard(buttons=chats_list,
+                              event=callback_query,
+                              message="Вот ваша коллекция чатов",
+                              current_page=callback_data.current_page,
+                              next_step=callback_data.next_step)
+    else:
+        topic_name = chats_list[callback_data.index]
+        topic_id = chats[topic_name]
+        files = await db.get_files(chats[topic_name])
+        await state.set_state(ReaderState.choose_file)
+        await state.update_data(topic_name=topic_name, topic_id=topic_id)
+        await render_keyboard(buttons=list(files.keys()),
+                              event=callback_query,
+                              message=f"В колекции {topic_name} есть следующие файлы",
+                              current_page=1,
+                              next_step=0)
 
-    current_items, new_page = paginated
-    navigation = build_navigation_buttons(new_page, TopicsPagination)
-    keyboard = pagination_maker(result_search=current_items, navigation=navigation)
-    await callback_query.message.edit_text("Вот ваша коллекция чатов", reply_markup=keyboard)
-
-
-async def show_topic_files(topic_id: int, db: Database):
+@user_router.callback_query(StateFilter(ReaderState.choose_file), PaginationButton.filter())
+async def choose_file(callback_query: CallbackQuery, state: FSMContext, db: Database, callback_data: PaginationButton):
+    data = await state.get_data()
+    topic_id : int = data['topic_id']
+    topic_name : str = data['topic_name']
     files = await db.get_files(topic_id)
-    topic_name = await db.get_topic_title(topic_id)
-    buttons_files = [(file, File(topic_id=topic_id, file_id=files[file]).pack()) for file in files.keys()]
-    return buttons_files, topic_name
+    files_id = list(files.values())
+    if is_navigation(callback_data) or callback_data.index > len(files_id):
+        await render_keyboard(buttons=list(files.keys()),
+                              event=callback_query,
+                              message=f"В колекции {topic_name} есть следующие файлы",
+                              current_page=callback_data.current_page,
+                              next_step=callback_data.next_step)
+    else:
+        file_id = files_id[callback_data.index]
+        session = await db.create_session(file_id, callback_query.from_user.id)
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            InlineKeyboardButton(text="Ссылка на документ",
+                                 web_app=WebAppInfo(url=f"{os.getenv('API_DOMAIN')}/?session_id={session}")),
+            InlineKeyboardButton(text="Назад",
+                                 callback_data=PaginationButton(current_page=callback_data.current_page, next_step=callback_data.next_step, index=-1).pack()),
+            width=1
+        )
+        await state.set_state(ReaderState.choose_file)
+        await callback_query.message.edit_text("Вот ваш документ", reply_markup=builder.as_markup())
 
-@user_router.callback_query(Topic.filter())
-async def open_topic(callback_query: CallbackQuery, db: Database, callback_data: Topic):
-    topic_id = callback_data.topic_id
-    buttons_files, topic_name  = await show_topic_files(topic_id, db)
 
-    navigation = build_navigation_buttons(1, FilesPagination, topic_id=topic_id)
-    keyboard = pagination_maker(result_search=buttons_files[:MAX_BUTTONS], navigation=navigation)
-
-    await callback_query.message.edit_text(f"В колекции {topic_name} есть следующие файлы", reply_markup=keyboard)
-
-@user_router.callback_query(FilesPagination.filter())
-async def files_pagination(callback_query: CallbackQuery, db: Database, callback_data: FilesPagination):
-    topic_id = callback_data.topic_id
-    buttons_files, topic_name  = await show_topic_files(topic_id, db)
-
-    paginated = calculate_pagination(buttons_files, callback_data.current_page, callback_data.next_step)
-    if not paginated:
-        await callback_query.answer("Дальше уже некуда")
-        return
-
-    current_items, new_page = paginated
-    navigation = build_navigation_buttons(new_page, FilesPagination, topic_id=topic_id)
-    keyboard = pagination_maker(result_search=current_items, navigation=navigation)
-    await callback_query.message.edit_text(f"В колекции {topic_name} есть следующие файлы", reply_markup=keyboard)
-
+@user_router.message(Command("clear"))
+async def clear_keyboard(message: Message):
+    await message.answer("Clear keyboard", reply_markup=ReplyKeyboardRemove())

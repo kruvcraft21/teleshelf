@@ -3,14 +3,14 @@ from typing import AsyncIterator
 import logging
 
 from clients.hydroclient import HydroClient
-from fastapi import FastAPI, Request, APIRouter
+from fastapi import FastAPI, Request, APIRouter, Body
 from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
 from config import load_config, Config
-from rich import inspect
 
+from database.db import Database
 
 from dotenv import load_dotenv
 import os
@@ -41,7 +41,7 @@ reader.mount("/js", StaticFiles(directory="static/js"), name="js")
 reader.mount("/pdfjs", StaticFiles(directory="static/pdfjs"), name="pdfjs")
 
 @reader.get("/", response_class=HTMLResponse)
-async def reader_page(request: Request, file_id: str):
+async def reader_page(request: Request, session_id: str  = ""):
     """Страница читалки"""
     headers = {
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -49,25 +49,39 @@ async def reader_page(request: Request, file_id: str):
         "Expires": "0",
     }
 
+    page = 0
+    if len(session_id) > 0:
+        db : Database = request.app.state.db
+        page = await db.get_page(session_id)
+
     return templates.TemplateResponse(
         request=request,
         name="reader.html",
         context={
-            "pdf_url": f"/api/pdf/{file_id}",
+            "session_id": session_id,
             "ver": str(uuid.uuid4()),
-            "level_debug": str(config.log.level)
+            "level_debug": str(config.log.level),
+            "page": page,
         },
         headers=headers,
     )
 
-@reader.get("/api/pdf/{file_id}", response_class=StreamingResponse)
-async def get_pdf(request: Request, file_id: str) -> AsyncIterator[bytes]:
+@reader.get("/api/pdf/{session_id}", response_class=StreamingResponse)
+async def get_pdf(request: Request, session_id: str) -> AsyncIterator[bytes]:
     """Стриминг PDF из Telegram"""
     
     bot = request.app.state.bot
-
+    db : Database = request.app.state.db
+    file_id = await db.get_file_tg_id(session_id)
     async for chunk in bot.stream_media(file_id):
         yield chunk
+
+@reader.post("/api/pdf/update_position/{session_id}")
+async def update_pdf_position(request: Request, session_id: str, page: int = Body(0, embed=True)):
+    """Обновление позиции PDF"""
+    db : Database = request.app.state.db
+    logger.info(f"session_id: {session_id}, page: {page}")
+    await db.update_page(session_id, page)
 
 @asynccontextmanager
 async def lifespan(fast_app: FastAPI):
