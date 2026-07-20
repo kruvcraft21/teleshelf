@@ -15,6 +15,7 @@ import uvicorn
 
 import logging
 import asyncio
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -35,7 +36,7 @@ async def start_app():
         token=config.bot.token,
     )
     db = await Database.create(config.database, config.redis)
-    dp = Dispatcher(storage=RedisStorage(db.redis.redis, data_ttl=300, state_ttl=300))
+    dp = Dispatcher(storage=RedisStorage(db.get_redis_poll(), data_ttl=300, state_ttl=300))
     dp.include_router(chats_router)
     dp.include_router(user_router)
     if config.log.level in ["DEBUG", "INFO"]:

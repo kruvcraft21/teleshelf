@@ -8,7 +8,7 @@ from sqlalchemy import URL, select
 
 from database.models import Base, UserChats, Topic, File, Position
 
-from database.redis_wrapper import RedisWrapper
+from database.redis_wrapper import RedisWrapper, Redis
 
 
 class Database:
@@ -16,7 +16,7 @@ class Database:
         self._engine = engin
         self._session = session_maker
         self.logger = logger
-        self.redis = redis
+        self._redis_wrap = redis
 
     @classmethod
     async def create(cls, db_settings: PGDatabseSettings, redis_settings: RedisSettings):
@@ -108,7 +108,7 @@ class Database:
         return result
 
     async def get_file_tg_id(self, session_id: str) -> str:
-        return await self.redis.get_tg_file_id(session_id)
+        return await self._redis_wrap.get_tg_file_id(session_id)
 
     async def create_session(self, file_id: int, user_id: int) -> str :
         result = ""
@@ -120,21 +120,24 @@ class Database:
                 if position is None:
                     position = Position(user_id=user_id, file_id=file_id, page=0)
                     session.add(position)
-                result = await self.redis.try_create_session(position, tg_file_id=tg_file_id)
+                result = await self._redis_wrap.try_create_session(position, tg_file_id=tg_file_id)
         return result
 
     async def get_page(self, session_id: str) -> int:
         if len(session_id) > 0:
-            return await self.redis.get_page(session_id)
+            return await self._redis_wrap.get_page(session_id)
         return 0
 
     async def update_page(self, session_id: str, page: int) -> None:
         if len(session_id) > 0:
-            await self.redis.update_page(session_id, page)
+            await self._redis_wrap.update_page(session_id, page)
+
+    def get_redis_poll(self) -> Redis:
+        return self._redis_wrap.get_poll()
 
     async def close(self):
         await self._engine.dispose()
-        await self.redis.close()
+        await self._redis_wrap.close()
 
 if __name__ == "__main__":
     from config import load_config
