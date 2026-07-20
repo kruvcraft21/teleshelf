@@ -12,8 +12,8 @@ class RedisWrapper:
         self._poll = poll
 
     @classmethod
-    async def get_redis_client(cls, redis_config: RedisSettings):
-        r = Redis(host=redis_config.host, port=redis_config.port, decode_responses=True, max_connections=10)
+    async def get_redis_client(cls, redis_config: RedisSettings, db : int = 0):
+        r = Redis(host=redis_config.host, port=redis_config.port, decode_responses=True, max_connections=10, db=db)
         self = cls(r)
         return self
 
@@ -52,6 +52,14 @@ class RedisWrapper:
         code = await self._poll.hset(session_id, "page", page)
         logger.info(f"Обновление записи {code}")
         await self._poll.expire(session_id, 3600)
+
+    async def get_sessions(self, template: str):
+        keys = await self._poll.keys(template)
+        async with self._poll.pipeline(transaction=False) as pipe:
+            for key in keys:
+                pipe.hgetall(key)
+            results = await pipe.execute()
+        return results
 
     async def close(self):
         await self._poll.aclose()

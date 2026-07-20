@@ -5,6 +5,7 @@ from config import PGDatabseSettings, RedisSettings
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
 from sqlalchemy import URL, select
+from sqlalchemy.dialects.postgresql import insert
 
 from database.models import Base, UserChats, Topic, File, Position
 
@@ -134,6 +135,20 @@ class Database:
 
     def get_redis_poll(self) -> Redis:
         return self._redis_wrap.get_poll()
+
+    def get_redis_wrap(self) -> RedisWrapper:
+        return self._redis_wrap
+
+    async def try_add_positions(self, positions: list[dict]):
+        stmt = insert(Position).values(positions)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[Position.user_id, Position.file_id],
+            set_={
+                "page": stmt.excluded.page,
+            }
+        )
+        async with self._session.begin() as session:
+            result = await session.execute(stmt)
 
     async def close(self):
         await self._engine.dispose()
