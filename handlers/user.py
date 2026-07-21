@@ -28,8 +28,7 @@ async def start(message: Message, db: Database, state: FSMContext):
     await render_keyboard(buttons=list(chats.keys()),
                           event=message,
                           message="Вот ваша коллекция чатов",
-                          current_page=1,
-                          next_step=0)
+                          next_page=1)
 
 @user_router.callback_query(StateFilter(ReaderState.choose_topic), PaginationButton.filter())
 async def choose_topic(callback_query: CallbackQuery, state: FSMContext, db: Database, callback_data: PaginationButton):
@@ -40,8 +39,7 @@ async def choose_topic(callback_query: CallbackQuery, state: FSMContext, db: Dat
         await render_keyboard(buttons=chats_list,
                               event=callback_query,
                               message="Вот ваша коллекция чатов",
-                              current_page=callback_data.current_page,
-                              next_step=callback_data.next_step)
+                              next_page=callback_data.current_page + callback_data.next_step)
     else:
         topic_name = chats_list[callback_data.index]
         topic_id = chats[topic_name]
@@ -51,8 +49,7 @@ async def choose_topic(callback_query: CallbackQuery, state: FSMContext, db: Dat
         await render_keyboard(buttons=list(files.keys()),
                               event=callback_query,
                               message=f"В колекции {topic_name} есть следующие файлы",
-                              current_page=1,
-                              next_step=0)
+                              next_page=1)
 
 @user_router.callback_query(StateFilter(ReaderState.choose_file), PaginationButton.filter())
 async def choose_file(callback_query: CallbackQuery, state: FSMContext, db: Database, callback_data: PaginationButton):
@@ -65,8 +62,7 @@ async def choose_file(callback_query: CallbackQuery, state: FSMContext, db: Data
         await render_keyboard(buttons=list(files.keys()),
                               event=callback_query,
                               message=f"В колекции {topic_name} есть следующие файлы",
-                              current_page=callback_data.current_page,
-                              next_step=callback_data.next_step)
+                              next_page=callback_data.current_page + callback_data.next_step)
     else:
         file_id = files_id[callback_data.index]
         session = await db.create_session(file_id, callback_query.from_user.id)
