@@ -32,6 +32,7 @@ class File(Base):
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey('topics.id', ondelete='CASCADE'))
     tg_file_id: Mapped[str] = mapped_column(Text, nullable=False)
     caption: Mapped[str | None] = mapped_column(Text)
+    file_type : Mapped[str] = mapped_column(Text, nullable=False)
 
     topic: Mapped["Topic"] = relationship(back_populates="files")
     positions: Mapped[list["Position"]] = relationship(back_populates="file", cascade="all, delete-orphan")

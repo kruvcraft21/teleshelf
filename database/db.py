@@ -73,13 +73,13 @@ class Database:
 
         return chat.id
 
-    async def try_add_file(self, file_id: str, topic_id: int, caption: str | None) -> None:
+    async def try_add_file(self, file_id: str, topic_id: int, caption: str | None, file_type: str) -> None:
         async with self._session.begin() as session:
             stmt = select(File.id).where(File.topic_id == topic_id,
                                          File.tg_file_id == file_id)
             file = await session.scalar(stmt)
             if file is None:
-                new_file = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[])
+                new_file = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[], file_type=file_type)
                 session.add(new_file)
 
     async def get_chats(self, user_id: int) -> dict[str, int]:
