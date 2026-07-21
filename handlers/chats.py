@@ -3,6 +3,7 @@ from aiogram.enums import ChatType
 from aiogram.types import Message
 from aiogram.filters import Command, CommandStart
 import logging
+from mimetypes import guess_type
 
 from database.db import Database
 
@@ -18,7 +19,6 @@ async def info(message: Message):
 async def put_documents(message: Message, db: Database):
     logging.info("По возможности добавляем пользователя в базу данных")
     await db.try_add_user(user_id=message.from_user.id, chat_id=message.chat.id)
-    chat_id = await db.try_add_chat(chat_id=message.chat.id, topic_id=message.message_thread_id, topic_title=message.chat.title)
     logging.info("По возможности добавляем чат в базу данных")
     topic_title = message.reply_to_message.forum_topic_created.name
     chat_id = await db.try_add_chat(chat_id=message.chat.id, topic_id=message.message_thread_id, topic_title=topic_title)
