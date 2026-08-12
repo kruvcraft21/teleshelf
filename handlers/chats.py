@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 
 from aiogram import Router, F
-from aiogram.enums import ChatType
-from aiogram.types import Message
-from aiogram.filters import Command, CommandStart
+from aiogram.types import Message, ChatMemberUpdated, MessageReactionUpdated
 from hydrogram.types import Message as hy_Message
+from aiogram.filters import Command, ChatMemberUpdatedFilter, IS_MEMBER, IS_NOT_MEMBER, CommandStart
 import logging
 from mimetypes import guess_type
 
@@ -35,9 +34,10 @@ async def try_add_document(document: DocumentInfo, db : Database):
     await db.try_add_file(document.file_id, topic_id=chat_id,
                           caption=document.file_name, file_type=document.file_type)
 
-@chats_router.message(Command(commands=['info']), F.from_user, F.chat.is_forum)
+@chats_router.message(Command('info'), F.from_user, F.chat.is_forum)
 async def info(message: Message):
     await message.answer("Есть пробитие")
+    logger.info(message.model_dump_json(indent=4, exclude_none=True))
 
 @chats_router.message(F.from_user, F.message_thread_id, F.document)
 async def put_documents(message: Message, db: Database):
@@ -59,7 +59,7 @@ async def is_document(message_reaction: MessageReactionUpdated, hy_client: Hydro
     message = message[0] if isinstance(message, list) else message
     return {'message': message} if message.document is not None else False
 
-@chats_router.message_reaction(is_document)
+@chats_router.message_reaction(is_document, F.chat.is_forum)
 async def react_message(message_reaction: MessageReactionUpdated, message: hy_Message, db: Database):
     if len(message_reaction.new_reaction) == 0:
         return
@@ -74,3 +74,19 @@ async def react_message(message_reaction: MessageReactionUpdated, message: hy_Me
     )
     await try_add_document(document=document, db=db)
 
+@chats_router.message(Command("update"), F.from_user, F.chat.is_forum)
+async def update_documents(message: Message, db: Database, hy_client: HydroClient):
+    topics = await hy_client.fetch_chat_content(chat_id=message.chat.id, message_id=message.message_id)
+    for topic in topics:
+        topic_id = await db.try_add_chat(message.chat.id, topic.topic_id, topic.topic_title)
+        for file in topic.files:
+            await db.try_add_file(file.file_id, topic_id, file.file_caption, file.file_type)
+    await message.answer("Вроде бы обновил коллекцию")
+
+@chats_router.chat_member(ChatMemberUpdatedFilter(IS_MEMBER >> IS_NOT_MEMBER))
+async def on_user_leave(event: ChatMemberUpdated):
+    pass
+
+@chats_router.chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
+async def on_user_join(event: ChatMemberUpdated):
+    pass
