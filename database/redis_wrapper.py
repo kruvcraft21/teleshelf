@@ -1,77 +1,106 @@
 from redis.asyncio import Redis
 
 from config import RedisSettings
-from database.models import Position
+from .models import Position
 import uuid
 import logging
 
 logger = logging.getLogger(__name__)
 
-class RedisWrapper:
-    def __init__(self, poll: Redis) -> None:
-        self._poll = poll
+
+class RedisSessionStore:
+    SESSION_TTL = 60 * 60
+
+    def __init__(self, redis_client: Redis):
+        self._redis = redis_client
 
     @classmethod
-    async def get_redis_client(cls, redis_config: RedisSettings, db : int = 0):
-        r = Redis(host=redis_config.host, port=redis_config.port, decode_responses=True, max_connections=10, db=db)
-        self = cls(r)
-        return self
+    def from_settings(cls, settings: RedisSettings, db: int = 0) -> "RedisSessionStore":
+        redis_client = Redis(
+            host=settings.host,
+            port=settings.port,
+            decode_responses=True,
+            max_connections=10,
+            db=db
+        )
+        return cls(redis_client)
 
-    def get_poll(self) -> Redis:
-        return self._poll
+    @property
+    def client(self) -> Redis:
+        return self._redis
 
-    async def try_create_session(self, position: Position, tg_file_id: str) -> str:
-        session_id = await self._poll.get(f"index:{position.user_id}:{position.file_id}")
-        logger.info(f"Получил объект типа {type(session_id)} {session_id}")
-        if (session_id is None) or (not isinstance(session_id, str)):
-            session_id = f"session:{uuid.uuid4()}"
-            async with self._poll.pipeline(transaction=True) as pipe:
-                pipe.set(f"index:{position.user_id}:{position.file_id}", session_id)
-                pipe.hset(session_id, mapping={"user_id": position.user_id,
-                                                      "file_id": position.file_id,
-                                                      "page": position.page,
-                                                      "tg_file_id": tg_file_id
-                                                      })
-                results = await pipe.execute()
-        await self._poll.expire(session_id, 3600)
-        await self._poll.expire(f"index:{position.user_id}:{position.file_id}", 3600)
-        return session_id
+    async def close(self):
+        await self._redis.aclose()
 
-    async def get_page_from_session(self, session_id: str) -> int:
-        page = await self._poll.hget(session_id, "page")
+    async def get_or_create(self, position: Position, tg_file_id: str) -> str:
+        new_session_id = f"session:{uuid.uuid4()}"
+        point_session = f"index:{position.user_id}:{position.file_id}"
+
+        old_session_id = await self._redis.set(
+            name=point_session,
+            value=new_session_id,
+            nx=True,
+            ex=self.SESSION_TTL,
+            get=True
+        )
+
+        if isinstance(old_session_id, str):
+            logger.info(f"Сессия уже существует: {old_session_id}")
+            await self._redis.expire(old_session_id, self.SESSION_TTL)
+            await self._redis.expire(point_session, self.SESSION_TTL)
+            return old_session_id
+
+        logger.info(f"Создана новая сессия: {new_session_id}")
+
+        async with self._redis.pipeline(transaction=True) as pipe:
+            pipe.hset(new_session_id,
+                      mapping={"user_id": position.user_id,
+                               "file_id": position.file_id,
+                               "page": position.page,
+                               "tg_file_id": tg_file_id
+                               }
+                      )
+            pipe.expire(new_session_id, self.SESSION_TTL)
+            await pipe.execute()
+        return new_session_id
+
+    async def get_page(self, session_id: str) -> int:
+        page = await self._redis.hget(session_id, "page")
         if page is None:
             logger.warning(f"Не удалось получить position_id для session_id: {session_id}")
             return 0
         return int(page)
 
-    async def get_page_by_file(self, user_id: int, file_id: int) -> int | None:
-        session_id = await self._poll.get(f"index:{user_id}:{file_id}")
-        if session_id is None:
+    async def get_page_by_file(self, user_id: int, file_id: int) -> int:
+        session_id = await self._redis.get(f"index:{user_id}:{file_id}")
+        if not isinstance(session_id, str):
             logger.warning(f"Не удалось получить session для {user_id}:{file_id}")
-            return None
-        page = await self._poll.hget(session_id, "page")
-        if not isinstance(page, str):
-            return None
-        return int(page)
-
-
+            return 0
+        return await self.get_page(session_id)
 
     async def get_tg_file_id(self, session_id: str) -> str:
-        tg_file_id = await self._poll.hget(session_id, "tg_file_id")
+        tg_file_id = await self._redis.hget(session_id, "tg_file_id")
         return str(tg_file_id) if tg_file_id is not None else ""
 
     async def update_page(self, session_id: str, page: int) -> None:
-        code = await self._poll.hset(session_id, "page", page)
-        logger.info(f"Обновление записи {code}")
-        await self._poll.expire(session_id, 3600)
+        session = await self._redis.hmget(session_id, "user_id", "file_id")
+        user_id, file_id = session
+        if user_id is None or file_id is None:
+            logger.warning(f"Не удалось обновить указатель для session_id: {session_id}")
+            return
 
-    async def get_sessions(self, template: str):
-        keys = await self._poll.keys(template)
-        async with self._poll.pipeline(transaction=False) as pipe:
-            for key in keys:
+        point_session = f"index:{user_id}:{file_id}"
+        async with self._redis.pipeline(transaction=True) as pipe:
+            pipe.hset(session_id, "page", page)
+            pipe.expire(session_id, self.SESSION_TTL)
+            pipe.expire(point_session, self.SESSION_TTL)
+            result = await pipe.execute()
+        logger.info(f"Обновление записи {result[0]}")
+
+    async def list_sessions(self) -> list[dict]:
+        results = []
+        async with self._redis.pipeline(transaction=False) as pipe:
+            async for key in self._redis.scan_iter(match="session:*"):
                 pipe.hgetall(key)
             results = await pipe.execute()
         return results
-
-    async def close(self):
-        await self._poll.aclose()
