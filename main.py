@@ -9,7 +9,7 @@ from handlers.other import other_router
 from handlers.user import user_router
 from database.db import Database
 
-from clients.hydroclient import HydroClient
+from clients import HydroClient
 
 from reader import reader
 
@@ -55,7 +55,7 @@ async def start_app() -> AppContext:
 
     await bot.delete_webhook(drop_pending_updates=True)
 
-    hy_client = await HydroClient.start(name="tg_reader",api_id=config.tg_api.api_id, api_hash=config.tg_api.api_hash, bot_token=config.bot.token)
+    hy_client = await HydroClient.create(name="tg_reader", api_id=config.tg_api.api_id, api_hash=config.tg_api.api_hash, bot_token=config.bot.token)
 
     transfer_job = DataTransferJob(db, db.get_redis_wrap())
     scheduler = AsyncIOScheduler()
