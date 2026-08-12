@@ -91,13 +91,25 @@ class Database:
                 result[topic.title] = topic.id
         return result
 
-    async def get_files(self, topic_id: int) -> dict[str, int]:
+    async def get_files(self, topic_id: int, user_id : int) -> dict[str, int]:
         result = {}
         async with self._session() as session:
-            stmt = select(File.id, File.caption).where(File.topic_id == topic_id)
+            stmt = (
+                select(File.id, File.caption, Position.page)
+                .outerjoin(
+                    Position, (Position.file_id == File.id) & (Position.user_id == user_id)
+                )
+                .where(File.topic_id == topic_id)
+                .order_by(File.id)
+            )
             rows = await session.execute(stmt)
-            for file_id, file_caption in rows:
-                result[file_caption] = file_id
+            for file_id, file_caption, page in rows:
+                caption = file_caption or "None"
+                redis_page = await self._redis_wrap.get_page_by_file(user_id, file_id)
+                now_page = redis_page or page
+                if now_page is not None:
+                    caption = f"{now_page} - {caption}"
+                result[caption] = file_id
         return result
 
     async def get_topic_title(self, topic_id: int) -> str:
@@ -126,7 +138,7 @@ class Database:
 
     async def get_page(self, session_id: str) -> int:
         if len(session_id) > 0:
-            return await self._redis_wrap.get_page(session_id)
+            return await self._redis_wrap.get_page_from_session(session_id)
         return 0
 
     async def update_page(self, session_id: str, page: int) -> None:
