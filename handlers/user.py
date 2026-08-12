@@ -2,6 +2,7 @@ from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from yarl import URL
 
 from database.db import Database
 from keyboards.pagination_maker import is_navigation, render_keyboard
@@ -43,7 +44,7 @@ async def choose_topic(callback_query: CallbackQuery, state: FSMContext, db: Dat
     else:
         topic_name = chats_list[callback_data.index]
         topic_id = chats[topic_name]
-        files = await db.get_files(chats[topic_name])
+        files = await db.get_files(chats[topic_name], user_id)
         await state.set_state(ReaderState.choose_file)
         await state.update_data(topic_name=topic_name, topic_id=topic_id)
         await render_keyboard(buttons=list(files.keys()),
@@ -56,7 +57,7 @@ async def choose_file(callback_query: CallbackQuery, state: FSMContext, db: Data
     data = await state.get_data()
     topic_id : int = data['topic_id']
     topic_name : str = data['topic_name']
-    files = await db.get_files(topic_id)
+    files = await db.get_files(topic_id, callback_query.from_user.id)
     files_id = list(files.values())
     if is_navigation(callback_data) or callback_data.index > len(files_id):
         await render_keyboard(buttons=list(files.keys()),
