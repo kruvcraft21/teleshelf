@@ -37,12 +37,24 @@ class RedisWrapper:
         await self._poll.expire(f"index:{position.user_id}:{position.file_id}", 3600)
         return session_id
 
-    async def get_page(self, session_id: str) -> int:
+    async def get_page_from_session(self, session_id: str) -> int:
         page = await self._poll.hget(session_id, "page")
         if page is None:
             logger.warning(f"Не удалось получить position_id для session_id: {session_id}")
             return 0
         return int(page)
+
+    async def get_page_by_file(self, user_id: int, file_id: int) -> int | None:
+        session_id = await self._poll.get(f"index:{user_id}:{file_id}")
+        if session_id is None:
+            logger.warning(f"Не удалось получить session для {user_id}:{file_id}")
+            return None
+        page = await self._poll.hget(session_id, "page")
+        if not isinstance(page, str):
+            return None
+        return int(page)
+
+
 
     async def get_tg_file_id(self, session_id: str) -> str:
         tg_file_id = await self._poll.hget(session_id, "tg_file_id")
