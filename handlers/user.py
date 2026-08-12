@@ -67,10 +67,12 @@ async def choose_file(callback_query: CallbackQuery, state: FSMContext, db: Data
     else:
         file_id = files_id[callback_data.index]
         session = await db.create_session(file_id, callback_query.from_user.id)
+        url = URL(os.getenv('API_DOMAIN', ""))
+        final_url = str(url.update_query(session_id=session))
         builder = InlineKeyboardBuilder()
         builder.row(
             InlineKeyboardButton(text="Ссылка на документ",
-                                 web_app=WebAppInfo(url=f"{os.getenv('API_DOMAIN')}/?session_id={session}")),
+                                 web_app=WebAppInfo(url=final_url)),
             InlineKeyboardButton(text="Назад",
                                  callback_data=PaginationButton(current_page=callback_data.current_page, next_step=callback_data.next_step, index=-1).pack()),
             width=1
