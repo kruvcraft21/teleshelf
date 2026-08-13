@@ -2,8 +2,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from docutils.nodes import caption
-
 from config import PGDatabseSettings
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
