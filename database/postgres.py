@@ -1,7 +1,10 @@
 import logging
+from dataclasses import dataclass
 from typing import Any
 
-from config import PGDatabseSettings, RedisSettings
+from docutils.nodes import caption
+
+from config import PGDatabseSettings
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
 from sqlalchemy import URL, select
@@ -9,18 +12,22 @@ from sqlalchemy.dialects.postgresql import insert
 
 from database.models import Base, UserChats, Topic, File, Position
 
-from database.redis_wrapper import RedisWrapper, Redis
+@dataclass
+class FileInfo:
+    file_id: int
+    caption: str
+    page: int
 
 
-class Database:
-    def __init__(self, engin : AsyncEngine, session_maker : async_sessionmaker[AsyncSession | Any], logger: logging.Logger, redis : RedisWrapper):
+class PostgresStorage:
+    def __init__(self, engin: AsyncEngine, session_maker: async_sessionmaker[AsyncSession | Any],
+                 logger: logging.Logger):
         self._engine = engin
         self._session = session_maker
         self.logger = logger
-        self._redis_wrap = redis
 
     @classmethod
-    async def create(cls, db_settings: PGDatabseSettings, redis_settings: RedisSettings):
+    async def create(cls, db_settings: PGDatabseSettings):
         # self = cls()
         logger = logging.getLogger(__name__)
         logger.info(f"Пытаемся подключится")
@@ -44,8 +51,7 @@ class Database:
             expire_on_commit=False,
             autoflush=False,
         )
-        redis = await RedisWrapper.get_redis_client(redis_settings)
-        self = cls(_engine, session_maker=_session, logger=logger, redis=redis)
+        self = cls(_engine, session_maker=_session, logger=logger)
         self.logger.info("Автоматическое создание таблиц при инициализации базы...")
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -53,7 +59,7 @@ class Database:
         self.logger.info("База данных полностью готова к работе.")
         return self
 
-    async def try_add_user(self, user_id : int, chat_id : int) -> None:
+    async def try_add_user(self, user_id: int, chat_id: int) -> None:
         async with self._session.begin() as session:
             users = await session.get(UserChats, (user_id, chat_id))
             if users is None:
@@ -62,8 +68,8 @@ class Database:
 
     async def try_add_chat(self, chat_id: int, topic_id: int, topic_title: str) -> int:
         async with self._session.begin() as session:
-            chat : Any = await session.scalar(select(Topic).where(Topic.chat_id == chat_id)
-                                  .where(Topic.topic_id == topic_id))
+            chat: Any = await session.scalar(select(Topic).where(Topic.chat_id == chat_id)
+                                             .where(Topic.topic_id == topic_id))
             if chat is None:
                 chat = Topic(chat_id=chat_id, topic_id=topic_id, files=[], title=topic_title)
                 session.add(chat)
@@ -79,7 +85,8 @@ class Database:
                                          File.tg_file_id == file_id)
             file = await session.scalar(stmt)
             if file is None:
-                new_file = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[], file_type=file_type)
+                new_file = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[],
+                                file_type=file_type)
                 session.add(new_file)
 
     async def get_chats(self, user_id: int) -> dict[str, int]:
@@ -91,8 +98,7 @@ class Database:
                 result[topic.title] = topic.id
         return result
 
-    async def get_files(self, topic_id: int, user_id : int) -> dict[str, int]:
-        result = {}
+    async def get_files(self, topic_id: int, user_id: int) -> list[FileInfo]:
         async with self._session() as session:
             stmt = (
                 select(File.id, File.caption, Position.page)
@@ -103,14 +109,14 @@ class Database:
                 .order_by(File.id)
             )
             rows = await session.execute(stmt)
-            for file_id, file_caption, page in rows:
-                caption = file_caption or "None"
-                redis_page = await self._redis_wrap.get_page_by_file(user_id, file_id)
-                now_page = redis_page or page
-                if now_page is not None:
-                    caption = f"{now_page} - {caption}"
-                result[caption] = file_id
-        return result
+            return [
+                FileInfo(
+                    file_id=file_id,
+                    caption=file_caption or "None",
+                    page=page or 0
+                )
+                for file_id, file_caption, page in rows
+            ]
 
     async def get_topic_title(self, topic_id: int) -> str:
         result = ""
@@ -120,36 +126,19 @@ class Database:
                 result = str(topic.title)
         return result
 
-    async def get_file_tg_id(self, session_id: str) -> str:
-        return await self._redis_wrap.get_tg_file_id(session_id)
-
-    async def create_session(self, file_id: int, user_id: int) -> str :
-        result = ""
+    async def get_or_create_position(self, file_id: int, user_id: int) -> tuple[Position | None, str]:
         async with self._session.begin() as session:
             position = await session.scalar(select(Position).where(Position.user_id == user_id,
                                                                    Position.file_id == file_id))
             tg_file_id = await session.scalar(select(File.tg_file_id).where(File.id == file_id))
-            if tg_file_id is not None:
-                if position is None:
-                    position = Position(user_id=user_id, file_id=file_id, page=0)
-                    session.add(position)
-                result = await self._redis_wrap.try_create_session(position, tg_file_id=tg_file_id)
-        return result
+            if tg_file_id is None:
+                return None, ""
 
-    async def get_page(self, session_id: str) -> int:
-        if len(session_id) > 0:
-            return await self._redis_wrap.get_page_from_session(session_id)
-        return 0
+            if position is None:
+                position = Position(user_id=user_id, file_id=file_id, page=0)
+                session.add(position)
 
-    async def update_page(self, session_id: str, page: int) -> None:
-        if len(session_id) > 0:
-            await self._redis_wrap.update_page(session_id, page)
-
-    def get_redis_poll(self) -> Redis:
-        return self._redis_wrap.get_poll()
-
-    def get_redis_wrap(self) -> RedisWrapper:
-        return self._redis_wrap
+            return position, tg_file_id
 
     async def try_add_positions(self, positions: list[dict]):
         stmt = insert(Position).values(positions)
@@ -164,7 +153,7 @@ class Database:
 
     async def close(self):
         await self._engine.dispose()
-        await self._redis_wrap.close()
+
 
 if __name__ == "__main__":
     from config import load_config
@@ -176,12 +165,15 @@ if __name__ == "__main__":
         format=config.log.format,
     )
 
+
     async def clear_db():
-        db = await Database.create(config.database)
+        db = await PostgresStorage.create(config.database)
         async with db._engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
+
     async def main():
-        db = await Database.create(config.database)
+        db = await PostgresStorage.create(config.database)
+
 
     asyncio.run(main())
