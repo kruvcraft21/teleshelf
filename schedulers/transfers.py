@@ -1,16 +1,13 @@
-from sqlalchemy.sql.elements import KeyedColumnElement
-
-from database.db import Database, RedisWrapper
+from database import PostgresStorage, RedisSessionStore
 from database.models import Position
 from apscheduler.events import JobExecutionEvent
 import logging
-from rich import inspect
 
 
 logger = logging.getLogger(__name__)
 
 class DataTransferJob:
-    def __init__(self, db: Database, redis_wrapper: RedisWrapper) -> None:
+    def __init__(self, db: PostgresStorage, redis_wrapper: RedisSessionStore) -> None:
         self._db = db
         self._redis_wrapper = redis_wrapper
         self._position_meta = DataTransferJob._get_position_meta()
@@ -37,11 +34,10 @@ class DataTransferJob:
 
 
     async def __call__(self):
-        sessions = await self._redis_wrapper.get_sessions("session:*")
-        inspect(sessions)
+        sessions = await self._redis_wrapper.list_sessions()
         if len(sessions) > 0:
             _session = self.prepare_items(sessions)
-            inspect(_session)
+            logger.info(_session)
             await self._db.try_add_positions(_session)
             logger.info("Трансфер сделан")
 
