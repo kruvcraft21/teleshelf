@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import asyncio
 
 from aiogram import Router, F
 from aiogram.types import Message, ChatMemberUpdated, MessageReactionUpdated
@@ -7,7 +8,7 @@ from aiogram.filters import Command, ChatMemberUpdatedFilter, IS_MEMBER, IS_NOT_
 import logging
 from mimetypes import guess_type
 
-from database.db import Database
+from database.postgres import PostgresStorage
 from clients.hydroclient import HydroClient
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class DocumentInfo:
     file_name : str
     file_type: str
 
-async def try_add_document(document: DocumentInfo, db : Database):
+async def try_add_document(document: DocumentInfo, db : PostgresStorage):
     logger.info("По возможности добавляем пользователя в базу данных")
     await db.try_add_user(user_id=document.user_id, chat_id=document.chat_id)
     logger.info("По возможности добавляем чат в базу данных")
@@ -40,7 +41,7 @@ async def info(message: Message):
     logger.info(message.model_dump_json(indent=4, exclude_none=True))
 
 @chats_router.message(F.from_user, F.message_thread_id, F.document)
-async def put_documents(message: Message, db: Database):
+async def put_documents(message: Message, db: PostgresStorage):
     document = DocumentInfo(
         user_id=message.from_user.id,
         chat_id=message.chat.id,
@@ -60,7 +61,7 @@ async def is_document(message_reaction: MessageReactionUpdated, hy_client: Hydro
     return {'message': message} if message.document is not None else False
 
 @chats_router.message_reaction(is_document, F.chat.is_forum)
-async def react_message(message_reaction: MessageReactionUpdated, message: hy_Message, db: Database):
+async def react_message(message_reaction: MessageReactionUpdated, message: hy_Message, db: PostgresStorage):
     if len(message_reaction.new_reaction) == 0:
         return
     document = DocumentInfo(
@@ -75,12 +76,26 @@ async def react_message(message_reaction: MessageReactionUpdated, message: hy_Me
     await try_add_document(document=document, db=db)
 
 @chats_router.message(Command("update"), F.from_user, F.chat.is_forum)
-async def update_documents(message: Message, db: Database, hy_client: HydroClient):
+async def update_documents(message: Message, db: PostgresStorage, hy_client: HydroClient):
     topics = await hy_client.fetch_chat_content(chat_id=message.chat.id, message_id=message.message_id)
-    for topic in topics:
-        topic_id = await db.try_add_chat(message.chat.id, topic.topic_id, topic.topic_title)
+    topic_cors = [db.try_add_chat(message.chat.id, topic.topic_id, topic.topic_title) for topic in topics]
+    topic_ids = await asyncio.gather(*topic_cors)
+    values = []
+    expected_files: dict[int, list[str]] = {}
+
+    for topic_id, topic in zip(topic_ids, topics):
+        expected_files[topic_id] = []
         for file in topic.files:
-            await db.try_add_file(file.file_id, topic_id, file.file_caption, file.file_type)
+            values.append({
+                "topic_id": topic_id,
+                "tg_file_id": file.file_id,
+                "caption": file.file_caption,
+                "file_type": file.file_type,
+            })
+
+            expected_files[topic_id].append(file.file_id)
+
+    await db.update_chat_status(message.chat.id, topic_ids, values, expected_files)
     await message.answer("Вроде бы обновил коллекцию")
 
 @chats_router.chat_member(ChatMemberUpdatedFilter(IS_MEMBER >> IS_NOT_MEMBER))

@@ -5,7 +5,7 @@ from typing import Any
 from config import PGDatabseSettings
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
-from sqlalchemy import URL, select
+from sqlalchemy import URL, select, delete
 from sqlalchemy.dialects.postgresql import insert
 
 from database.models import Base, UserChats, Topic, File, Position
@@ -86,6 +86,44 @@ class PostgresStorage:
                 new_file = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[],
                                 file_type=file_type)
                 session.add(new_file)
+
+    @staticmethod
+    async def _upsert_files(files: list[dict], session: AsyncSession) -> None:
+        if not files:
+            return
+        stmt = insert(File).values(files)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[File.topic_id, File.tg_file_id],
+            set_={
+                "caption": stmt.excluded.caption,
+                "file_type": stmt.excluded.file_type,
+            }
+        )
+        await session.execute(stmt)
+
+    @staticmethod
+    async def _delete_missing_files(expected_files, session: AsyncSession) -> None:
+        for topic_id, file_ids in expected_files.items():
+            await session.execute(
+                delete(File).where(File.topic_id == topic_id, File.tg_file_id.notin_(file_ids))
+            )
+
+    @staticmethod
+    async def _delete_topics(chat_id: int, topic_ids: list[int], session: AsyncSession) -> None:
+        await session.execute(
+            delete(Topic).where(Topic.id.notin_(topic_ids), Topic.chat_id == chat_id)
+        )
+
+    async def update_chat_status(self,
+                                 chat_id: int,
+                                 topic_ids: list[int],
+                                 files: list[dict],
+                                 expected_files: dict[int, list[str]]
+                                 ) -> None:
+        async with self._session.begin() as session:
+            await self._upsert_files(files, session)
+            await self._delete_topics(chat_id, topic_ids, session)
+            await self._delete_missing_files(expected_files, session)
 
     async def get_chats(self, user_id: int) -> dict[str, int]:
         result = {}
