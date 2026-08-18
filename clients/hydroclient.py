@@ -29,11 +29,12 @@ class HydroClient(Client):
     async def fetch_chat_content(self, chat_id, message_id : int) -> list[Topic]:
         all_ids = list(range(1, message_id + 1))
         batches = [all_ids[i:i + BATCH_SIZE] for i in range(0, len(all_ids), BATCH_SIZE)]
+        all_messages : list [Message] = []
         for batch in batches:
             messages = await self.get_messages(chat_id, batch)
             if isinstance(messages, list):
-                return self._group_messages_by_topic(messages)
-        return []
+                all_messages.extend(messages)
+        return self._group_messages_by_topic(all_messages)
 
     @staticmethod
     def _group_messages_by_topic(messages: list[Message]) -> list[Topic]:
