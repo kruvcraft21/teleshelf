@@ -37,6 +37,10 @@ class File(Base):
     topic: Mapped["Topic"] = relationship(back_populates="files")
     positions: Mapped[list["Position"]] = relationship(back_populates="file", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        Index("unique_topic_file", "topic_id", "tg_file_id", unique=True),
+    )
+
 class Position(Base):
     __tablename__ = 'positions'
 
