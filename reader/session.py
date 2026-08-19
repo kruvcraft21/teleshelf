@@ -18,10 +18,8 @@ class ReaderSession:
         result = {}
         for file in files:
             redis_page = await self._redis.get_page_by_file(user_id, file.file_id)
-            caption = file.caption
+            caption = f"стр. {file.page} - {file.caption}"
             if redis_page > file.page:
-                caption = f"{redis_page} - {caption}"
-            elif redis_page < file.page:
-                caption = f"{file.page} - {caption}"
+                caption = f"стр. {redis_page} - {file.caption}"
             result[caption] = file.file_id
         return result
