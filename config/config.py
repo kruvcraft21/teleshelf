@@ -1,44 +1,8 @@
-from dataclasses import dataclass
+from config.models import Config, TgBot, LogSettings, PGDatabseSettings, TgApiServer, RedisSettings, ApiSettings
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
-
-@dataclass
-class TgBot:
-    token: str  # Токен для доступа к телеграм-боту
-
-@dataclass
-class LogSettings:
-    level: str
-    format: str
-
-@dataclass
-class PGDatabseSettings:
-    host: str
-    port: int
-    database: str
-    username: str
-    password: str
-
-@dataclass
-class TgApiServer:
-    api_id: int
-    api_hash: str
-
-
-@dataclass
-class RedisSettings:
-    host: str
-    port: int
-
-@dataclass
-class Config:
-    bot: TgBot
-    log: LogSettings
-    database: PGDatabseSettings
-    tg_api: TgApiServer
-    redis: RedisSettings
 
 def load_config(path: str | None = None) -> Config:
     return Config(
@@ -53,4 +17,5 @@ def load_config(path: str | None = None) -> Config:
         tg_api=TgApiServer(api_id=int(os.getenv("TELEGRAM_API_ID", "0")),
                            api_hash=os.getenv("TELEGRAM_API_HASH", ""),),
         redis = RedisSettings(host=os.getenv("REDIS_HOST", ""), port=int(os.getenv("REDIS_PORT", "6379")),),
+        api = ApiSettings(api_domain=os.getenv("API_DOMAIN", ""),)
     )

@@ -8,21 +8,14 @@ from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
-from config import load_config, Config
+from config import load_config
 from reader.dependencies import Db, Hydro, Redis
 
-from dotenv import load_dotenv
 import os
 import uuid
 
-load_dotenv()
-
 # Конфигурация
-API_ID = int(os.getenv("TELEGRAM_API_ID", "0"))
-API_HASH = os.getenv("TELEGRAM_API_HASH", "")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-
-config: Config = load_config()
+config = load_config()
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.getLevelName(level=config.log.level),

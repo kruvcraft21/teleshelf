@@ -1,7 +1,7 @@
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 
-from config import load_config, Config
+from config import load_config
 
 from handlers.chats import chats_router
 from handlers.other import other_router
@@ -23,9 +23,10 @@ from fastapi import FastAPI
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from schedulers.transfers import DataTransferJob
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
-config: Config = load_config()
+config = load_config()
 logging.basicConfig(
     level=logging.getLevelName(level=config.log.level),
     format=config.log.format,
@@ -57,7 +58,7 @@ async def start_app() -> AppContext:
 
     transfer_job = DataTransferJob(db, redis)
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(transfer_job.__call__, trigger="interval", minutes=30, max_instances=1)
+    scheduler.add_job(transfer_job.__call__, trigger="interval", minutes=2, max_instances=1, next_run_time=datetime.now())
     scheduler.add_listener(transfer_job.handle_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
     return AppContext(
@@ -85,6 +86,7 @@ async def lifespan(fast_app: FastAPI):
         db=context.db,
         hy_client=context.hydro,
         session_manager=context.reader_session,
+        config=config,
         handle_signals=False
     ))
     context.scheduler.start()
