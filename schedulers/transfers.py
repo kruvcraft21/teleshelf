@@ -37,9 +37,9 @@ class DataTransferJob:
         sessions = await self._redis_wrapper.list_sessions()
         if len(sessions) > 0:
             _session = self.prepare_items(sessions)
-            logger.info(_session)
+            logger.debug(_session)
             await self._db.try_add_positions(_session)
-            logger.info("Трансфер сделан")
+            logger.debug("Трансфер сделан")
 
     @staticmethod
     def handle_event(event : JobExecutionEvent):
