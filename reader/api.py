@@ -61,8 +61,10 @@ async def reader_page(request: Request, redis_session: Redis, session_id: str  =
 async def get_pdf(request: Request, bot: Hydro, redis_session: Redis, session_id: str) -> AsyncIterator[bytes]:
     """Стриминг PDF из Telegram"""
 
-    file_id = await redis_session.get_tg_file_id(session_id)
-    async for chunk in bot.stream_media(file_id):
+    chat_id = await redis_session.get_chat_id(session_id)
+    message_id = await redis_session.get_message_id(session_id)
+    message = await bot.get_messages(chat_id, message_id)
+    async for chunk in bot.stream_media(message):
         yield chunk
 
 @reader.post("/api/pdf/update_position/{session_id}")
