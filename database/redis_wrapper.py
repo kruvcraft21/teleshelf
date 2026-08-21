@@ -1,6 +1,6 @@
 from redis.asyncio import Redis
 
-from config import RedisSettings
+from config.models import RedisSettings
 from .models import Position
 import uuid
 import logging
