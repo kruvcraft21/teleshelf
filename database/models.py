@@ -22,7 +22,7 @@ class Topic(Base):
     files: Mapped[list["File"]] = relationship(back_populates="topic", cascade="all, delete-orphan")
 
     __table_args__ = (
-        Index("uniqe_chat_topic_id", "chat_id", "topic_id", unique=True),
+        Index("unique_chat_topic_id", "chat_id", "topic_id", unique=True),
     )
 
 class File(Base):
@@ -30,7 +30,7 @@ class File(Base):
 
     id : Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey('topics.id', ondelete='CASCADE'))
-    tg_file_id: Mapped[str] = mapped_column(Text, nullable=False)
+    tg_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     caption: Mapped[str | None] = mapped_column(Text)
     file_type : Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -38,7 +38,7 @@ class File(Base):
     positions: Mapped[list["Position"]] = relationship(back_populates="file", cascade="all, delete-orphan")
 
     __table_args__ = (
-        Index("unique_topic_file", "topic_id", "tg_file_id", unique=True),
+        Index("unique_topic_file", "topic_id", "tg_message_id", unique=True),
     )
 
 class Position(Base):
