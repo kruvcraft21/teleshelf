@@ -8,7 +8,7 @@ BATCH_SIZE = 100
 
 @dataclass
 class File:
-    file_id: str
+    message_id: int
     file_caption: str
     file_type : str
 
@@ -52,7 +52,7 @@ class HydroClient(Client):
             )
 
             topic.files.append(File(
-                file_id=message.document.file_id,
+                message_id=message.id,
                 file_caption=message.caption or message.document.file_name or 'No caption',
                 file_type=message.document.mime_type or 'unknown',
             ))

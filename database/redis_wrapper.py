@@ -32,7 +32,7 @@ class RedisSessionStore:
     async def close(self):
         await self._redis.aclose()
 
-    async def get_or_create(self, position: Position, tg_file_id: str) -> str:
+    async def get_or_create(self, position: Position, chat_id : int, message_id: int) -> str:
         new_session_id = f"session:{uuid.uuid4()}"
         point_session = f"index:{position.user_id}:{position.file_id}"
 
@@ -57,7 +57,8 @@ class RedisSessionStore:
                       mapping={"user_id": position.user_id,
                                "file_id": position.file_id,
                                "page": position.page,
-                               "tg_file_id": tg_file_id
+                               "chat_id": chat_id,
+                               "message_id": message_id
                                }
                       )
             pipe.expire(new_session_id, self.SESSION_TTL)
@@ -78,9 +79,13 @@ class RedisSessionStore:
             return 0
         return await self.get_page(session_id)
 
-    async def get_tg_file_id(self, session_id: str) -> str:
-        tg_file_id = await self._redis.hget(session_id, "tg_file_id")
-        return str(tg_file_id) if tg_file_id is not None else ""
+    async def get_chat_id(self, session_id: str) -> int:
+        chat_id = await self._redis.hget(session_id, "chat_id")
+        return int(chat_id) if chat_id is not None else -1
+
+    async def get_message_id(self, session_id: str) -> int:
+        message_id = await self._redis.hget(session_id, "message_id")
+        return int(message_id) if message_id is not None else -1
 
     async def update_page(self, session_id: str, page: int) -> None:
         session = await self._redis.hmget(session_id, "user_id", "file_id")

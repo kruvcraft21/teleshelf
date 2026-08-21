@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from config import PGDatabseSettings
+from config.models import PGDatabseSettings
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
 from sqlalchemy import URL, select, delete
@@ -77,23 +77,13 @@ class PostgresStorage:
 
         return chat.id
 
-    async def try_add_file(self, file_id: str, topic_id: int, caption: str | None, file_type: str) -> None:
-        async with self._session.begin() as session:
-            stmt = select(File.id).where(File.topic_id == topic_id,
-                                         File.tg_file_id == file_id)
-            file = await session.scalar(stmt)
-            if file is None:
-                new_file = File(topic_id=topic_id, caption=caption, tg_file_id=file_id, positions=[],
-                                file_type=file_type)
-                session.add(new_file)
-
     @staticmethod
     async def _upsert_files(files: list[dict], session: AsyncSession) -> None:
         if not files:
             return
         stmt = insert(File).values(files)
         stmt = stmt.on_conflict_do_update(
-            index_elements=[File.topic_id, File.tg_file_id],
+            index_elements=[File.topic_id, File.tg_message_id],
             set_={
                 "caption": stmt.excluded.caption,
                 "file_type": stmt.excluded.file_type,
@@ -105,7 +95,7 @@ class PostgresStorage:
     async def _delete_missing_files(expected_files, session: AsyncSession) -> None:
         for topic_id, file_ids in expected_files.items():
             await session.execute(
-                delete(File).where(File.topic_id == topic_id, File.tg_file_id.notin_(file_ids))
+                delete(File).where(File.topic_id == topic_id, File.tg_message_id.notin_(file_ids))
             )
 
     @staticmethod
@@ -118,7 +108,7 @@ class PostgresStorage:
                                  chat_id: int,
                                  topic_ids: list[int],
                                  files: list[dict],
-                                 expected_files: dict[int, list[str]]
+                                 expected_files: dict[int, list[int]]
                                  ) -> None:
         async with self._session.begin() as session:
             await self._upsert_files(files, session)
@@ -162,19 +152,22 @@ class PostgresStorage:
                 result = str(topic.title)
         return result
 
-    async def get_or_create_position(self, file_id: int, user_id: int) -> tuple[Position | None, str]:
+    async def get_or_create_position(self, file_id: int, user_id: int) -> tuple[Position | None, int, int]:
         async with self._session.begin() as session:
             position = await session.scalar(select(Position).where(Position.user_id == user_id,
                                                                    Position.file_id == file_id))
-            tg_file_id = await session.scalar(select(File.tg_file_id).where(File.id == file_id))
-            if tg_file_id is None:
-                return None, ""
+            stmt = (
+                select(Topic.chat_id, File.tg_message_id)
+                .join(File, File.topic_id == Topic.id)
+                .where(File.id == file_id)
+            )
+            chat_id, message_id = (await session.execute(stmt)).one()
 
             if position is None:
                 position = Position(user_id=user_id, file_id=file_id, page=0)
                 session.add(position)
 
-            return position, tg_file_id
+            return position, chat_id, message_id
 
     async def try_add_positions(self, positions: list[dict]):
         stmt = insert(Position).values(positions)

@@ -23,19 +23,19 @@ async def update_documents(message: Message, db: PostgresStorage, hy_client: Hyd
     topic_cors = [db.try_add_chat(message.chat.id, topic.topic_id, topic.topic_title) for topic in topics]
     topic_ids = await asyncio.gather(*topic_cors)
     values = []
-    expected_files: dict[int, list[str]] = {}
+    expected_files: dict[int, list[int]] = {}
 
     for topic_id, topic in zip(topic_ids, topics):
         expected_files[topic_id] = []
         for file in topic.files:
             values.append({
                 "topic_id": topic_id,
-                "tg_file_id": file.file_id,
+                "tg_message_id": file.message_id,
                 "caption": file.file_caption,
                 "file_type": file.file_type,
             })
 
-            expected_files[topic_id].append(file.file_id)
+            expected_files[topic_id].append(file.message_id)
 
     await db.update_chat_status(message.chat.id, topic_ids, values, expected_files)
     await message.answer("Вроде бы обновил коллекцию")
