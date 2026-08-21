@@ -72,11 +72,6 @@ async def start_app() -> AppContext:
     )
 
 
-async def stop_app(client: HydroClient, db: PostgresStorage):
-    await client.stop()
-    await db.close()
-
-
 @asynccontextmanager
 async def lifespan(fast_app: FastAPI):
     context = await start_app()
@@ -97,7 +92,8 @@ async def lifespan(fast_app: FastAPI):
         await asyncio.gather(
             context.dp.stop_polling(),
             context.hydro.stop(),
-            context.db.close()
+            context.db.close(),
+            context.redis.close(),
         )
         context.scheduler.shutdown()
 
@@ -111,8 +107,10 @@ async def main():
     try:
         await dp.start_polling(bot, db=db, hy_client=hy_client)
     finally:
-        await db.close()
-        await hy_client.stop()
+        await asyncio.gather(db.close(),
+                             hy_client.stop(),
+                             app_con.redis.close()
+                             )
 
 
 app = FastAPI(lifespan=lifespan)
