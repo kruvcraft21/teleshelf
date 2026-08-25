@@ -37,7 +37,11 @@ async def update_documents(message: Message, db: PostgresStorage, hy_client: Hyd
 
             expected_files[topic_id].append(file.message_id)
 
-    await db.update_chat_status(message.chat.id, topic_ids, values, expected_files)
+    await db.update_chat_files(message.chat.id, topic_ids, values, expected_files)
+
+    members = await hy_client.fetch_chat_members(chat_id=message.chat.id)
+    await db.update_chat_members(message.chat.id, members)
+
     await message.answer("Вроде бы обновил коллекцию")
 
 @chats_router.chat_member(ChatMemberUpdatedFilter(IS_MEMBER >> IS_NOT_MEMBER))

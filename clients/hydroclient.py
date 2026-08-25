@@ -1,8 +1,8 @@
+from dataclasses import dataclass, field
+from functools import wraps
+
 from hydrogram import Client
 from hydrogram.types import Message
-from dataclasses import dataclass, field
-
-from functools import wraps
 
 BATCH_SIZE = 100
 
@@ -35,6 +35,14 @@ class HydroClient(Client):
             if isinstance(messages, list):
                 all_messages.extend(messages)
         return self._group_messages_by_topic(all_messages)
+
+    async def fetch_chat_members(self, chat_id : int) -> list[dict[str, int]]:
+        members = []
+        # pyrefly: ignore [not-iterable]
+        async for member in self.get_chat_members(chat_id):
+            if member.user and not member.user.is_bot:
+                members.append({"user_id": member.user.id, "chat_id": chat_id})
+        return members
 
     @staticmethod
     def _group_messages_by_topic(messages: list[Message]) -> list[Topic]:

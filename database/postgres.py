@@ -115,6 +115,38 @@ class PostgresStorage:
             await self._delete_topics(chat_id, topic_ids, session)
             await self._delete_missing_files(expected_files, session)
 
+    @staticmethod
+    async def _upsert_chat_members(
+        members: list[dict[str, int]], session: AsyncSession
+    ) -> None:
+        if not members:
+            return
+        stmt = insert(UserChats).values(members)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[UserChats.user_id, UserChats.chat_id]
+        )
+        await session.execute(stmt)
+
+    @staticmethod
+    async def _delete_chat_members(
+        members: list[dict[str, int]], chat_id: int, session: AsyncSession
+    ) -> None:
+        user_ids = [member["user_id"] for member in members]
+        if user_ids:
+            stmt = (
+                delete(UserChats)
+                .where(UserChats.chat_id == chat_id)
+                .where(UserChats.user_id.notin_(user_ids))
+            )
+            await session.execute(stmt)
+
+    async def update_chat_members(
+        self, chat_id: int, members: list[dict[str, int]]
+    ) -> None:
+        async with self._session.begin() as session:
+            await self._upsert_chat_members(members, session)
+            await self._delete_chat_members(members, chat_id, session)
+
     async def get_chats(self, user_id: int) -> dict[str, int]:
         result = {}
         async with self._session() as session:
