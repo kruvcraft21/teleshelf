@@ -2,13 +2,18 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from config.models import PGDatabseSettings
-
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
-from sqlalchemy import URL, select, delete
+from sqlalchemy import URL, delete, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
-from database.models import Base, UserChats, Topic, File, Position
+from config.models import PGDatabseSettings
+from database.models import Base, File, Position, Topic, UserChats
+
 
 @dataclass
 class FileInfo:
@@ -18,8 +23,12 @@ class FileInfo:
 
 
 class PostgresStorage:
-    def __init__(self, engin: AsyncEngine, session_maker: async_sessionmaker[AsyncSession | Any],
-                 logger: logging.Logger):
+    def __init__(
+        self,
+        engin: AsyncEngine,
+        session_maker: async_sessionmaker[AsyncSession | Any],
+        logger: logging.Logger,
+    ):
         self._engine = engin
         self._session = session_maker
         self.logger = logger
@@ -28,7 +37,7 @@ class PostgresStorage:
     async def create(cls, db_settings: PGDatabseSettings):
         # self = cls()
         logger = logging.getLogger(__name__)
-        logger.info(f"Пытаемся подключится")
+        logger.info("Пытаемся подключится")
         database_url = URL.create(
             drivername="postgresql+asyncpg",
             username=db_settings.username,
@@ -37,7 +46,7 @@ class PostgresStorage:
             port=db_settings.port,
             database=db_settings.database,
         )
-        logger.info(f"Вроде бы получили ссылку")
+        logger.info("Вроде бы получили ссылку")
         _engine = create_async_engine(
             database_url,
             echo=False,
@@ -66,10 +75,15 @@ class PostgresStorage:
 
     async def try_add_chat(self, chat_id: int, topic_id: int, topic_title: str) -> int:
         async with self._session.begin() as session:
-            chat: Any = await session.scalar(select(Topic).where(Topic.chat_id == chat_id)
-                                             .where(Topic.topic_id == topic_id))
+            chat: Any = await session.scalar(
+                select(Topic)
+                .where(Topic.chat_id == chat_id)
+                .where(Topic.topic_id == topic_id)
+            )
             if chat is None:
-                chat = Topic(chat_id=chat_id, topic_id=topic_id, files=[], title=topic_title)
+                chat = Topic(
+                    chat_id=chat_id, topic_id=topic_id, files=[], title=topic_title
+                )
                 session.add(chat)
 
             if chat.title != topic_title:
@@ -87,7 +101,7 @@ class PostgresStorage:
             set_={
                 "caption": stmt.excluded.caption,
                 "file_type": stmt.excluded.file_type,
-            }
+            },
         )
         await session.execute(stmt)
 
@@ -95,21 +109,26 @@ class PostgresStorage:
     async def _delete_missing_files(expected_files, session: AsyncSession) -> None:
         for topic_id, file_ids in expected_files.items():
             await session.execute(
-                delete(File).where(File.topic_id == topic_id, File.tg_message_id.notin_(file_ids))
+                delete(File).where(
+                    File.topic_id == topic_id, File.tg_message_id.notin_(file_ids)
+                )
             )
 
     @staticmethod
-    async def _delete_topics(chat_id: int, topic_ids: list[int], session: AsyncSession) -> None:
+    async def _delete_topics(
+        chat_id: int, topic_ids: list[int], session: AsyncSession
+    ) -> None:
         await session.execute(
             delete(Topic).where(Topic.id.notin_(topic_ids), Topic.chat_id == chat_id)
         )
 
-    async def update_chat_status(self,
-                                 chat_id: int,
-                                 topic_ids: list[int],
-                                 files: list[dict],
-                                 expected_files: dict[int, list[int]]
-                                 ) -> None:
+    async def update_chat_files(
+        self,
+        chat_id: int,
+        topic_ids: list[int],
+        files: list[dict],
+        expected_files: dict[int, list[int]],
+    ) -> None:
         async with self._session.begin() as session:
             await self._upsert_files(files, session)
             await self._delete_topics(chat_id, topic_ids, session)
@@ -150,8 +169,12 @@ class PostgresStorage:
     async def get_chats(self, user_id: int) -> dict[str, int]:
         result = {}
         async with self._session() as session:
-            user_chats = await session.scalars(select(UserChats.chat_id).where(UserChats.user_id == user_id))
-            iter_topic = await session.execute(select(Topic.id, Topic.title).where(Topic.chat_id.in_(user_chats)))
+            user_chats = await session.scalars(
+                select(UserChats.chat_id).where(UserChats.user_id == user_id)
+            )
+            iter_topic = await session.execute(
+                select(Topic.id, Topic.title).where(Topic.chat_id.in_(user_chats))
+            )
             for topic in iter_topic.all():
                 result[topic.title] = topic.id
         return result
@@ -161,7 +184,8 @@ class PostgresStorage:
             stmt = (
                 select(File.id, File.caption, Position.page)
                 .outerjoin(
-                    Position, (Position.file_id == File.id) & (Position.user_id == user_id)
+                    Position,
+                    (Position.file_id == File.id) & (Position.user_id == user_id),
                 )
                 .where(File.topic_id == topic_id)
                 .order_by(File.id)
@@ -169,9 +193,7 @@ class PostgresStorage:
             rows = await session.execute(stmt)
             return [
                 FileInfo(
-                    file_id=file_id,
-                    caption=file_caption or "None",
-                    page=page or 0
+                    file_id=file_id, caption=file_caption or "None", page=page or 0
                 )
                 for file_id, file_caption, page in rows
             ]
@@ -184,10 +206,15 @@ class PostgresStorage:
                 result = str(topic.title)
         return result
 
-    async def get_or_create_position(self, file_id: int, user_id: int) -> tuple[Position | None, int, int]:
+    async def get_or_create_position(
+        self, file_id: int, user_id: int
+    ) -> tuple[Position | None, int, int]:
         async with self._session.begin() as session:
-            position = await session.scalar(select(Position).where(Position.user_id == user_id,
-                                                                   Position.file_id == file_id))
+            position = await session.scalar(
+                select(Position).where(
+                    Position.user_id == user_id, Position.file_id == file_id
+                )
+            )
             stmt = (
                 select(Topic.chat_id, File.tg_message_id)
                 .join(File, File.topic_id == Topic.id)
@@ -207,18 +234,19 @@ class PostgresStorage:
             index_elements=[Position.user_id, Position.file_id],
             set_={
                 "page": stmt.excluded.page,
-            }
+            },
         )
         async with self._session.begin() as session:
-            result = await session.execute(stmt)
+            await session.execute(stmt)
 
     async def close(self):
         await self._engine.dispose()
 
 
 if __name__ == "__main__":
-    from config import load_config
     import asyncio
+
+    from config import load_config
 
     config = load_config()
     logging.basicConfig(
@@ -226,15 +254,12 @@ if __name__ == "__main__":
         format=config.log.format,
     )
 
-
     async def clear_db():
         db = await PostgresStorage.create(config.database)
         async with db._engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
-
     async def main():
-        db = await PostgresStorage.create(config.database)
-
+        await PostgresStorage.create(config.database)
 
     asyncio.run(main())

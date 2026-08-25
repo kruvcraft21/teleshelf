@@ -1,29 +1,23 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
-
-from config import load_config
-
-from handlers.chats import chats_router
-from handlers.other import other_router
-from handlers.user import user_router
-from database import PostgresStorage, RedisSessionStore
-
-from clients import HydroClient
-
-from reader import ReaderSession
-from reader.api import reader
-from core import AppContext
-
-import logging
-import asyncio
-
-from contextlib import asynccontextmanager
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from bot.handlers.chats import chats_router
+from bot.handlers.other import other_router
+from bot.handlers.user import user_router
+from clients import HydroClient
+from config import load_config
+from core import AppContext
+from database import PostgresStorage, RedisSessionStore
+from reader import ReaderSession, reader
 from schedulers.transfers import DataTransferJob
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 config = load_config()
@@ -53,13 +47,25 @@ async def start_app() -> AppContext:
 
     await bot.delete_webhook(drop_pending_updates=True)
 
-    hy_client = await HydroClient.create(name="tg_reader", api_id=config.tg_api.api_id, api_hash=config.tg_api.api_hash,
-                                         bot_token=config.bot.token)
+    hy_client = await HydroClient.create(
+        name="tg_reader",
+        api_id=config.tg_api.api_id,
+        api_hash=config.tg_api.api_hash,
+        bot_token=config.bot.token,
+    )
 
     transfer_job = DataTransferJob(db, redis)
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(transfer_job.__call__, trigger="interval", minutes=2, max_instances=1, next_run_time=datetime.now())
-    scheduler.add_listener(transfer_job.handle_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+    scheduler.add_job(
+        transfer_job.__call__,
+        trigger="interval",
+        minutes=2,
+        max_instances=1,
+        next_run_time=datetime.now(timezone.utc),
+    )
+    scheduler.add_listener(
+        transfer_job.handle_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR
+    )
 
     return AppContext(
         bot=bot,
@@ -76,14 +82,16 @@ async def start_app() -> AppContext:
 async def lifespan(fast_app: FastAPI):
     context = await start_app()
     fast_app.state.context = context
-    fast_app.state.polling_task = asyncio.create_task(context.dp.start_polling(
-        context.bot,
-        db=context.db,
-        hy_client=context.hydro,
-        session_manager=context.reader_session,
-        config=config,
-        handle_signals=False
-    ))
+    fast_app.state.polling_task = asyncio.create_task(
+        context.dp.start_polling(
+            context.bot,
+            db=context.db,
+            hy_client=context.hydro,
+            session_manager=context.reader_session,
+            config=config,
+            handle_signals=False,
+        )
+    )
     context.scheduler.start()
     try:
         yield
@@ -107,10 +115,7 @@ async def main():
     try:
         await dp.start_polling(bot, db=db, hy_client=hy_client)
     finally:
-        await asyncio.gather(db.close(),
-                             hy_client.stop(),
-                             app_con.redis.close()
-                             )
+        await asyncio.gather(db.close(), hy_client.stop(), app_con.redis.close())
 
 
 app = FastAPI(lifespan=lifespan)

@@ -1,9 +1,11 @@
+import logging
+import uuid
+
 from redis.asyncio import Redis
 
 from config.models import RedisSettings
+
 from .models import Position
-import uuid
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ class RedisSessionStore:
             port=settings.port,
             decode_responses=True,
             max_connections=10,
-            db=db
+            db=db,
         )
         return cls(redis_client)
 
@@ -32,7 +34,9 @@ class RedisSessionStore:
     async def close(self):
         await self._redis.aclose()
 
-    async def get_or_create(self, position: Position, chat_id : int, message_id: int) -> str:
+    async def get_or_create(
+        self, position: Position, chat_id: int, message_id: int
+    ) -> str:
         new_session_id = f"session:{uuid.uuid4()}"
         point_session = f"index:{position.user_id}:{position.file_id}"
 
@@ -41,7 +45,7 @@ class RedisSessionStore:
             value=new_session_id,
             nx=True,
             ex=self.SESSION_TTL,
-            get=True
+            get=True,
         )
 
         if isinstance(old_session_id, str):
@@ -53,14 +57,16 @@ class RedisSessionStore:
         logger.info(f"Создана новая сессия: {new_session_id}")
 
         async with self._redis.pipeline(transaction=True) as pipe:
-            pipe.hset(new_session_id,
-                      mapping={"user_id": position.user_id,
-                               "file_id": position.file_id,
-                               "page": position.page,
-                               "chat_id": chat_id,
-                               "message_id": message_id
-                               }
-                      )
+            pipe.hset(
+                new_session_id,
+                mapping={
+                    "user_id": position.user_id,
+                    "file_id": position.file_id,
+                    "page": position.page,
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                },
+            )
             pipe.expire(new_session_id, self.SESSION_TTL)
             await pipe.execute()
         return new_session_id
@@ -68,7 +74,9 @@ class RedisSessionStore:
     async def get_page(self, session_id: str) -> int:
         page = await self._redis.hget(session_id, "page")
         if page is None:
-            logger.warning(f"Не удалось получить position_id для session_id: {session_id}")
+            logger.warning(
+                f"Не удалось получить position_id для session_id: {session_id}"
+            )
             return 0
         return int(page)
 
@@ -91,7 +99,9 @@ class RedisSessionStore:
         session = await self._redis.hmget(session_id, "user_id", "file_id")
         user_id, file_id = session
         if user_id is None or file_id is None:
-            logger.warning(f"Не удалось обновить указатель для session_id: {session_id}")
+            logger.warning(
+                f"Не удалось обновить указатель для session_id: {session_id}"
+            )
             return
 
         point_session = f"index:{user_id}:{file_id}"

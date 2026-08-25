@@ -1,6 +1,7 @@
 from aiogram.filters.callback_data import CallbackData
 
-class PaginationButton(CallbackData, prefix='pg'):
+
+class PaginationButton(CallbackData, prefix="pg"):
     current_page: int = 0
     next_step: int = 0
     index: int = -1

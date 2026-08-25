@@ -1,3 +1,3 @@
 from core.context import AppContext
 
-__all__ = ['AppContext']
+__all__ = ["AppContext"]

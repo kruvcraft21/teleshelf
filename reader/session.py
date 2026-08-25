@@ -1,4 +1,5 @@
-from database import RedisSessionStore, PostgresStorage
+from database import PostgresStorage, RedisSessionStore
+
 
 class ReaderSession:
     def __init__(self, postgres: PostgresStorage, redis: RedisSessionStore):
@@ -6,7 +7,9 @@ class ReaderSession:
         self._redis = redis
 
     async def create(self, file_id: int, user_id: int) -> str:
-        position, chat_id, message_id = await self._postgres.get_or_create_position(file_id, user_id)
+        position, chat_id, message_id = await self._postgres.get_or_create_position(
+            file_id, user_id
+        )
 
         if position is None:
             return ""

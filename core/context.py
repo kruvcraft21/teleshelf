@@ -7,6 +7,7 @@ from clients import HydroClient
 from database import PostgresStorage, RedisSessionStore
 from reader.session import ReaderSession
 
+
 @dataclass(slots=True)
 class AppContext:
     bot: Bot

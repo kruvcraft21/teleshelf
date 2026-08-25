@@ -1,13 +1,16 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class TgBot:
     token: str  # Токен для доступа к телеграм-боту
+
 
 @dataclass
 class LogSettings:
     level: str
     format: str
+
 
 @dataclass
 class PGDatabseSettings:
@@ -16,6 +19,7 @@ class PGDatabseSettings:
     database: str
     username: str
     password: str
+
 
 @dataclass
 class TgApiServer:
@@ -28,9 +32,11 @@ class RedisSettings:
     host: str
     port: int
 
+
 @dataclass
 class ApiSettings:
     api_domain: str
+
 
 @dataclass
 class Config:

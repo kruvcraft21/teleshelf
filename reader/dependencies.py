@@ -2,35 +2,39 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from database import PostgresStorage, RedisSessionStore
 from clients import HydroClient
-from reader.session import ReaderSession
 from core.context import AppContext
+from database import PostgresStorage, RedisSessionStore
+from reader.session import ReaderSession
 
 
-def get_context(request: Request) -> AppContext:
+def _get_context(request: Request) -> AppContext:
     return request.app.state.context
 
 
-def get_db(context: AppContext = Depends(get_context)) -> PostgresStorage:
+AppCont = Annotated[AppContext, Depends(_get_context)]
+
+
+def _get_db(context: AppCont) -> PostgresStorage:
     return context.db
 
 
-def get_hydro(context: AppContext = Depends(get_context)) -> HydroClient:
+def _get_hydro(context: AppCont) -> HydroClient:
     return context.hydro
 
 
-def get_reader_session(context: AppContext = Depends(get_context)) -> ReaderSession:
+def _get_reader_session(context: AppCont) -> ReaderSession:
     return context.reader_session
 
-def get_redis(context: AppContext = Depends(get_context)) -> RedisSessionStore:
+
+def _get_redis(context: AppCont) -> RedisSessionStore:
     return context.redis
 
 
-Db = Annotated[PostgresStorage, Depends(get_db)]
-Hydro = Annotated[HydroClient, Depends(get_hydro)]
+Db = Annotated[PostgresStorage, Depends(_get_db)]
+Hydro = Annotated[HydroClient, Depends(_get_hydro)]
 ReaderSessionDependency = Annotated[
     ReaderSession,
-    Depends(get_reader_session),
+    Depends(_get_reader_session),
 ]
-Redis = Annotated[RedisSessionStore, Depends(get_redis)]
+Redis = Annotated[RedisSessionStore, Depends(_get_redis)]
