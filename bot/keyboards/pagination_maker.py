@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from callbacks.pagination import PaginationButton
+from bot.callbacks import PaginationButton
 
 MAX_BUTTONS = 5
 

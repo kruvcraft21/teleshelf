@@ -6,15 +6,14 @@ from yarl import URL
 
 from database.postgres import PostgresStorage
 from reader import ReaderSession
-from keyboards.pagination_maker import is_navigation, render_keyboard
-from callbacks.pagination import PaginationButton
+from bot.keyboards.pagination_maker import is_navigation, render_keyboard
+from bot.callbacks import PaginationButton
 from config.models import Config
 
-from callbacks.reader_state import ReaderState
+from bot.callbacks import ReaderState
 from aiogram.fsm.context import FSMContext
 
 import logging
-import os
 
 user_router = Router()
 
