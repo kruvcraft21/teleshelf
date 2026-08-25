@@ -1,0 +1,44 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  default:
+    format: "${LOG_FORMAT}"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: "${LOG_LEVEL}"
+    formatter: default
+    stream: ext://sys.stdout
+
+root:
+  level: DEBUG
+  handlers:
+    - console
+
+loggers:
+  uvicorn:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
+
+  uvicorn.error:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
+
+  uvicorn.access:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
+
+  hydrogram.session.session:
+    level: INFO
+    handlers:
+      - console
+    propagate: false

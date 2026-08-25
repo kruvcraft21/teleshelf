@@ -11,15 +11,13 @@ from fastapi.templating import Jinja2Templates
 
 from clients.hydroclient import HydroClient
 from config import load_config
+from config.logging import config_logger
 from reader.dependencies import Hydro, Redis
 
 # Конфигурация
 config = load_config()
+config_logger(config.log)
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.getLevelName(level=config.log.level),
-    format=config.log.format,
-)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 logger.info(f"BASE_DIR: {BASE_DIR}")

@@ -14,17 +14,15 @@ from bot.handlers.other import other_router
 from bot.handlers.user import user_router
 from clients import HydroClient
 from config import load_config
+from config.logging import config_logger
 from core import AppContext
 from database import PostgresStorage, RedisSessionStore
 from reader import ReaderSession, reader
 from schedulers.transfers import DataTransferJob
 
-logger = logging.getLogger(__name__)
 config = load_config()
-logging.basicConfig(
-    level=logging.getLevelName(level=config.log.level),
-    format=config.log.format,
-)
+config_logger(config.log)
+logger = logging.getLogger(__name__)
 
 
 async def start_app() -> AppContext:
