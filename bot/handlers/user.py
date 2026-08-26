@@ -3,6 +3,7 @@ import logging
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import default_state
 from aiogram.types import (
     CallbackQuery,
     InaccessibleMessage,
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 @user_router.message(CommandStart(), F.from_user)
 async def start(message: Message, db: PostgresStorage, state: FSMContext):
     # pyrefly: ignore [bad-assignment]
-    user : User = message.from_user
+    user: User = message.from_user
     chats = await db.get_chats(user.id)
     if len(chats) == 0:
         await message.answer("Увы нет чатов")
@@ -134,6 +135,14 @@ async def choose_file(
         return
 
     await callback_query.answer()
+
+
+@user_router.callback_query(StateFilter(default_state), PaginationButton.filter())
+async def expired_pagination(callback_query: CallbackQuery) -> None:
+    await callback_query.answer(
+        "Этот список уже устарел. Отправьте /start, чтобы открыть новый.",
+        show_alert=True,
+    )
 
 
 @user_router.message(Command("clear"))
