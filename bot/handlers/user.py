@@ -5,16 +5,19 @@ from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CallbackQuery,
-    InlineKeyboardButton,
+    InaccessibleMessage,
     Message,
     ReplyKeyboardRemove,
-    WebAppInfo,
+    User,
 )
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from yarl import URL
 
 from bot.callbacks import PaginationButton, ReaderState
-from bot.keyboards.pagination_maker import is_navigation, render_keyboard
+from bot.keyboards.pagination_maker import (
+    document_keyboard,
+    file_keyboard,
+    topic_keyboard,
+)
 from config.models import Config
 from database.postgres import PostgresStorage
 from reader import ReaderSession
@@ -26,17 +29,15 @@ logger = logging.getLogger(__name__)
 
 @user_router.message(CommandStart(), F.from_user)
 async def start(message: Message, db: PostgresStorage, state: FSMContext):
-    user_id = message.from_user.id
-    chats = await db.get_chats(user_id)
+    # pyrefly: ignore [bad-assignment]
+    user : User = message.from_user
+    chats = await db.get_chats(user.id)
     if len(chats) == 0:
         await message.answer("Увы нет чатов")
         return
     await state.set_state(ReaderState.choose_topic)
-    await render_keyboard(
-        buttons=list(chats.keys()),
-        event=message,
-        message="Вот ваша коллекция чатов",
-        next_page=1,
+    await message.answer(
+        "Вот ваша коллекция чатов", reply_markup=topic_keyboard(chats, 1)
     )
 
 
@@ -50,28 +51,36 @@ async def choose_topic(
     session_manager: ReaderSession,
     callback_data: PaginationButton,
 ):
+    if (
+        isinstance(callback_query.message, InaccessibleMessage)
+        or callback_query.message is None
+    ):
+        callback_query.answer("Обновите список чатов", show_alert=True)
+        return
+
     user_id = callback_query.from_user.id
     chats = await db.get_chats(user_id)
-    chats_list = list(chats.keys())
-    if is_navigation(callback_data) or callback_data.index > len(chats_list):
-        await render_keyboard(
-            buttons=chats_list,
-            event=callback_query,
-            message="Вот ваша коллекция чатов",
-            next_page=callback_data.current_page + callback_data.next_step,
+
+    if callback_data.action == "page":
+        await callback_query.message.edit_text(
+            "Вот ваша коллекция чатов",
+            reply_markup=topic_keyboard(chats, callback_data.page),
         )
-    else:
-        topic_name = chats_list[callback_data.index]
-        topic_id = chats[topic_name]
+    elif callback_data.action == "topic":
+        chats_list = list(chats.items())
+        topic_name, topic_id = chats_list[callback_data.index]
         files = await session_manager.get_files(topic_id, user_id)
         await state.set_state(ReaderState.choose_file)
         await state.update_data(topic_name=topic_name, topic_id=topic_id)
-        await render_keyboard(
-            buttons=list(files.keys()),
-            event=callback_query,
-            message=f"В колекции {topic_name} есть следующие файлы",
-            next_page=1,
+        await callback_query.message.edit_text(
+            f"В колекции {topic_name} есть следующие файлы",
+            reply_markup=file_keyboard(files, 1),
         )
+    else:
+        await callback_query.answer("Недоступное действие", show_alert=True)
+        return
+
+    await callback_query.answer()
 
 
 @user_router.callback_query(
@@ -82,44 +91,49 @@ async def choose_file(
     state: FSMContext,
     session_manager: ReaderSession,
     callback_data: PaginationButton,
+    db: PostgresStorage,
     config: Config,
 ):
+    if (
+        isinstance(callback_query.message, InaccessibleMessage)
+        or callback_query.message is None
+    ):
+        callback_query.answer("Обновите список чатов", show_alert=True)
+        return
+
     data = await state.get_data()
+
+    if callback_data.action == "back_to_topics":
+        await state.set_state(ReaderState.choose_topic)
+        chats = await db.get_chats(callback_query.from_user.id)
+        await callback_query.message.edit_text(
+            "Вот ваша коллекция чатов", reply_markup=topic_keyboard(chats, 1)
+        )
+        return
+
     topic_id: int = data["topic_id"]
     topic_name: str = data["topic_name"]
     files = await session_manager.get_files(topic_id, callback_query.from_user.id)
-    files_id = list(files.values())
-    if is_navigation(callback_data) or callback_data.index > len(files_id):
-        await render_keyboard(
-            buttons=list(files.keys()),
-            event=callback_query,
-            message=f"В колекции {topic_name} есть следующие файлы",
-            next_page=callback_data.current_page + callback_data.next_step,
+
+    if callback_data.action in ["page", "back_to_files"]:
+        await callback_query.message.edit_text(
+            f"В колекции {topic_name} есть следующие файлы",
+            reply_markup=file_keyboard(files, callback_data.page),
+        )
+    elif callback_data.action == "file":
+        files_list = list(files.items())
+        file_name, file_id = files_list[callback_data.index]
+        session = await session_manager.create(file_id, callback_query.from_user.id)
+        document_url = str(URL(config.api.api_domain).update_query(session_id=session))
+        await callback_query.message.edit_text(
+            f"Вот ваш документ: {file_name}",
+            reply_markup=document_keyboard(document_url, 1),
         )
     else:
-        file_id = files_id[callback_data.index]
-        session = await session_manager.create(file_id, callback_query.from_user.id)
-        url = URL(config.api.api_domain)
-        final_url = str(url.update_query(session_id=session))
-        builder = InlineKeyboardBuilder()
-        builder.row(
-            InlineKeyboardButton(
-                text="Ссылка на документ", web_app=WebAppInfo(url=final_url)
-            ),
-            InlineKeyboardButton(
-                text="Назад",
-                callback_data=PaginationButton(
-                    current_page=callback_data.current_page,
-                    next_step=callback_data.next_step,
-                    index=-1,
-                ).pack(),
-            ),
-            width=1,
-        )
-        await state.set_state(ReaderState.choose_file)
-        await callback_query.message.edit_text(
-            "Вот ваш документ", reply_markup=builder.as_markup()
-        )
+        await callback_query.answer("Недоступное действие", show_alert=True)
+        return
+
+    await callback_query.answer()
 
 
 @user_router.message(Command("clear"))

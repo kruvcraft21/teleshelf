@@ -1,8 +1,9 @@
+from typing import Literal
+
 from aiogram.types import (
-    CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    Message,
+    WebAppInfo,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -10,61 +11,95 @@ from bot.callbacks import PaginationButton
 
 MAX_BUTTONS = 5
 
-
-def _calculate_pagination(
-    buttons: list[tuple[str, str]], next_page: int
-) -> list[tuple[str, str]] | None:
-    total_pages = len(buttons) // MAX_BUTTONS + (
-        1 if len(buttons) % MAX_BUTTONS > 0 else 0
-    )
-    if next_page <= 0 or next_page > total_pages:
-        return None
-
-    start_index = (next_page - 1) * MAX_BUTTONS
-    end_index = min(start_index + MAX_BUTTONS, len(buttons))
-    return buttons[start_index:end_index]
+ItemAction = Literal["topic", "file"]
+BackAction = Literal["back_to_topics"]
 
 
-def _pagination_maker(
-    result_search: list[tuple[str, str]], navigation: list[str]
+def _get_page(items: list[str], page: int) -> tuple[list[str], int, int, int]:
+    total_pages = len(items) // MAX_BUTTONS + (1 if len(items) % MAX_BUTTONS > 0 else 0)
+    current_page = min(max(page, 1), total_pages)
+
+    start_index = (current_page - 1) * MAX_BUTTONS
+    end_index = min(start_index + MAX_BUTTONS, len(items))
+    return items[start_index:end_index], current_page, start_index, total_pages
+
+
+def _add_navigation_buttons(
+    builder: InlineKeyboardBuilder, page: int, total_pages: int
+) -> None:
+    buttons: list[InlineKeyboardButton] = []
+    if page > 1:
+        buttons.append(
+            InlineKeyboardButton(
+                text="<<",
+                callback_data=PaginationButton(action="page", page=page - 1).pack(),
+            )
+        )
+    if page < total_pages:
+        buttons.append(
+            InlineKeyboardButton(
+                text=">>",
+                callback_data=PaginationButton(action="page", page=page + 1).pack(),
+            )
+        )
+    builder.row(*buttons)
+
+
+def _catalog_maker(
+    items: list[str],
+    page: int,
+    item_action: ItemAction,
+    back_action: BackAction | None = None,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    result_keyboard = [
-        InlineKeyboardButton(text=result, callback_data=callback)
-        for result, callback in result_search
-    ]
-    builder.row(*result_keyboard, width=1)
-    navigation_keyboard = [
-        InlineKeyboardButton(text="<<", callback_data=navigation[0]),
-        InlineKeyboardButton(text=">>", callback_data=navigation[1]),
-    ]
-    builder.row(*navigation_keyboard)
+
+    items, current_page, start_index, total_pages = _get_page(items, page)
+
+    for idx, item in enumerate(items, start=start_index):
+        builder.row(
+            InlineKeyboardButton(
+                text=item,
+                callback_data=PaginationButton(action=item_action, index=idx).pack(),
+            )
+        )
+
+    _add_navigation_buttons(builder, current_page, total_pages)
+
+    if back_action:
+        builder.row(
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=PaginationButton(action=back_action).pack(),
+            )
+        )
     return builder.as_markup()
 
+def topic_keyboard(chats: dict[str, int], page: int) -> InlineKeyboardMarkup:
+    return _catalog_maker(
+        items=list(chats.keys()),
+        page=page,
+        item_action="topic",
+    )
 
-def is_navigation(callback_data: PaginationButton) -> bool:
-    return callback_data.index == -1
+def file_keyboard(files: dict[str, int], page: int) -> InlineKeyboardMarkup:
+    return _catalog_maker(
+        items=list(files.keys()),
+        page=page,
+        item_action="file",
+        back_action="back_to_topics",
+    )
 
-
-async def render_keyboard(
-    buttons: list[str], event: CallbackQuery | Message, message: str, next_page
-):
-    buttons_topics = [
-        (chat, PaginationButton(index=idx).pack()) for idx, chat in enumerate(buttons)
-    ]
-    paginated = _calculate_pagination(buttons_topics, next_page)
-
-    if not paginated:
-        await event.answer("Дальше уже некуда")
-        return
-
-    current_items = paginated
-    navigation = [
-        PaginationButton(current_page=next_page, next_step=-1).pack(),
-        PaginationButton(current_page=next_page, next_step=1).pack(),
-    ]
-    keyboard = _pagination_maker(result_search=current_items, navigation=navigation)
-    if isinstance(event, CallbackQuery):
-        await event.message.edit_text(message, reply_markup=keyboard)
-    else:
-        await event.answer(message, reply_markup=keyboard)
+def document_keyboard(url: str, page: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="Ссылка на документ", web_app=WebAppInfo(url=url)
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="Назад",
+            callback_data=PaginationButton(action="back_to_files", page=page).pack(),
+        )
+    )
+    return builder.as_markup()
