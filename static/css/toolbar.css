@@ -13,6 +13,25 @@
     /* --toolbar-bg-color: #e74c3c !important; */
 }
 
+/* Telegram Mini App: browser-level actions are unavailable or unnecessary. */
+#viewsManagerToggleButton,
+#printButton,
+#downloadButton,
+#secondaryPrint,
+#secondaryDownload,
+#secondaryOpenFile {
+    display: none !important;
+}
+
+/* Hide the layout elements that only separated the removed controls. */
+#toolbarViewerLeft > .toolbarButtonSpacer,
+#editorModeSeparator + .toolbarHorizontalGroup.hiddenMediumView,
+#editorModeSeparator + .toolbarHorizontalGroup.hiddenMediumView + .verticalToolbarSeparator,
+#outerContainer #secondaryToolbar #secondaryToolbarButtonContainer > .visibleMediumView,
+#secondaryOpenFile + .visibleMediumView + .horizontalToolbarSeparator {
+    display: none !important;
+}
+
 @media (prefers-color-scheme: dark) {
     :root {
         --toolbar-glass-bg-color: rgb(34 34 38 / 0.58);
@@ -99,6 +118,17 @@
 .doorHanger {
     left: 50% !important;
     transform: translateX(-50%) !important;
+}
+
+/* Preserve the default position above the toolbar, with a top screen inset. */
+#secondaryToolbar #secondaryToolbarButtonContainer {
+    --telegram-menu-top-gap: 12px;
+
+    max-height: calc(
+        100dvh - var(--telegram-content-safe-area-inset-top, 0px) -
+            var(--toolbar-height) - var(--bottom-toolbar-offset) - 38px -
+            var(--telegram-menu-top-gap)
+    ) !important;
 }
 
 

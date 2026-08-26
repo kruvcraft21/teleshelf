@@ -7,9 +7,21 @@ const check = document.getElementById("check");
 
 const session_id = frame.dataset.session_id
 const current_page = frame.dataset.page
-const queryString = window.location.search;
-const urlParams = new URLSearchParams(queryString);
-const ver = urlParams.get('v')
+const assetsVersion = frame.dataset.assetsVersion;
+
+function updatePdfSafeArea() {
+    const contentTop = getComputedStyle(document.documentElement)
+        .getPropertyValue("--telegram-content-safe-area-inset-top")
+        .trim() || "0px";
+    const iframeRoot = frame.contentDocument?.documentElement;
+
+    iframeRoot?.style.setProperty(
+        "--telegram-content-safe-area-inset-top",
+        contentTop,
+    );
+}
+
+window.addEventListener("telegram-content-safe-area-changed", updatePdfSafeArea);
 
 function setLoading(text) {
     spinner.style.display = "block";
@@ -48,8 +60,9 @@ frame.onload = () => {
         const iframeDoc = frame.contentDocument || frame.contentWindow.document;
         const linkTag = iframeDoc.createElement('link');
         linkTag.rel = 'stylesheet';
-        linkTag.href = `/css/toolbar.css?v=${ver}`;
+        linkTag.href = `/css/toolbar.css?v=${encodeURIComponent(assetsVersion)}`;
         iframeDoc.head.appendChild(linkTag);
+        updatePdfSafeArea();
         const viewerApp = frame.contentWindow.PDFViewerApplication;
         if (viewerApp) {
             setLoading("Открытие документа...");
@@ -64,7 +77,7 @@ frame.onload = () => {
                         headers: {
                             "Content-Type": "application/json"
                         },
-                        body: JSON.stringify({ page: page })
+                        body: JSON.stringify({page: page})
                     })
                 });
             });
