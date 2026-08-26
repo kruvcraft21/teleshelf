@@ -23,6 +23,13 @@ async def info(message: Message):
 async def update_documents(
     message: Message, db: PostgresStorage, hy_client: HydroClient
 ):
+    is_admin = await hy_client.is_admin(message.chat.id)
+    if not is_admin:
+        await message.answer(
+            "У бота нет доступа к сообщениям форума. Попросите админа добавить бота в админы."
+        )
+        return
+
     topics = await hy_client.fetch_chat_content(
         chat_id=message.chat.id, message_id=message.message_id
     )

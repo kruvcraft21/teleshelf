@@ -1,11 +1,14 @@
+import logging
 from dataclasses import dataclass, field
 from functools import wraps
 
 from hydrogram import Client
+from hydrogram.enums import ChatMemberStatus
 from hydrogram.types import Message
 
 BATCH_SIZE = 100
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class File:
@@ -71,5 +74,8 @@ class HydroClient(Client):
                     file_type=message.document.mime_type or "unknown",
                 )
             )
-
         return list(topics.values())
+
+    async def is_admin(self, chat_id: int) -> bool:
+        user = await self.get_chat_member(chat_id, "me")
+        return user.status == ChatMemberStatus.ADMINISTRATOR or user.status == ChatMemberStatus.OWNER
