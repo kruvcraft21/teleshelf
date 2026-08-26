@@ -1,0 +1,7 @@
+aiogram==3.30.0
+hydrogram==0.2.0
+fastapi[standard]==0.141.1
+apscheduler==3.11.3
+sqlalchemy==2.0.51
+asyncpg==0.31.0
+redis==8.0.1
