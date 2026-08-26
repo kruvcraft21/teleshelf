@@ -16,7 +16,6 @@ from reader.dependencies import Hydro, Redis
 
 # Конфигурация
 config = load_config()
-config_logger(config.log)
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -86,6 +85,7 @@ async def update_pdf_position(
 
 @asynccontextmanager
 async def lifespan(fast_app: FastAPI):
+    config_logger(config.log)
     bot = await HydroClient.create(
         name="tg_reader",
         api_id=config.tg_api.api_id,
