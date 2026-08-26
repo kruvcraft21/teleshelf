@@ -42,3 +42,9 @@ loggers:
     handlers:
       - console
     propagate: false
+
+  aiosqlite:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
