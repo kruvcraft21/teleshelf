@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="{{ url_for("css", path="main.css") }}?v={{ ver }}">
-    <link rel="stylesheet" href="{{ url_for("css", path="status-bar.css") }}?v={{ ver }}">
-    <link rel="stylesheet" href="{{ url_for("css", path="pdf-frame.css") }}?v={{ ver }}">
-    <script src="{{ url_for("js", path="webapp-worker.js") }}?v={{ ver }}"></script>
+    <link rel="stylesheet" href="{{ request.app.url_path_for("css", path="main.css") }}?v={{ ver }}">
+    <link rel="stylesheet" href="{{ request.app.url_path_for("css", path="status-bar.css") }}?v={{ ver }}">
+    <link rel="stylesheet" href="{{ request.app.url_path_for("css", path="pdf-frame.css") }}?v={{ ver }}">
+    <link rel="preload" as="style" href="{{ request.app.url_path_for("css", path="toolbar.css") }}?v={{ ver }}">
+    <script src="{{ request.app.url_path_for("js", path="webapp-worker.js") }}?v={{ ver }}"></script>
 </head>
 
 <body>
@@ -26,7 +27,7 @@
     >
     </iframe>
 
-    <script src="{{ url_for("js", path="pdf-viewer.js") }}?v={{ ver }}"></script>
+    <script src="{{ request.app.url_path_for("js", path="pdf-viewer.js") }}?v={{ ver }}"></script>
     {%if level_debug in ['INFO', 'DEBUG'] -%}
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
     <script>eruda.init();</script>
