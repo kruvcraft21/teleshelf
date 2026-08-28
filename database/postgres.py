@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import URL, delete, select
+from sqlalchemy import URL, delete, select, values
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -229,7 +229,23 @@ class PostgresStorage:
             return position, chat_id, message_id
 
     async def try_add_positions(self, positions: list[dict]):
-        stmt = insert(Position).values(positions)
+        positions_columns = tuple(Position.__table__.columns)
+        redis_positions = (
+            values(
+                *positions_columns
+            )
+            .data(
+                [
+                    (position["user_id"], position["file_id"], position["page"])
+                    for position in positions
+                ]
+            )
+            .alias("redis_positions")
+        )
+        exist_file_positions = (
+            select(redis_positions).join(File, File.id == redis_positions.c.file_id)
+        )
+        stmt = insert(Position).from_select(positions_columns, exist_file_positions)
         stmt = stmt.on_conflict_do_update(
             index_elements=[Position.user_id, Position.file_id],
             set_={
