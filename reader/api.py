@@ -18,8 +18,7 @@ from reader.dependencies import Hydro, Redis
 config = load_config()
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-logger.info(f"BASE_DIR: {BASE_DIR}")
+
 
 # FastAPI приложение
 reader = APIRouter()

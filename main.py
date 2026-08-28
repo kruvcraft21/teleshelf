@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -24,6 +25,8 @@ config = load_config()
 config_logger(config.log)
 logger = logging.getLogger(__name__)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+logger.info(f"BASE_DIR: {BASE_DIR}")
 
 async def start_app() -> AppContext:
     # Выводим в консоль информацию о начале запуска бота
@@ -50,6 +53,7 @@ async def start_app() -> AppContext:
         api_id=config.tg_api.api_id,
         api_hash=config.tg_api.api_hash,
         bot_token=config.bot.token,
+        workdir=BASE_DIR,
     )
 
     transfer_job = DataTransferJob(db, redis)
