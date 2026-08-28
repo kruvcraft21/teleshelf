@@ -17,11 +17,30 @@ Telegram-бот для библиотеки документов в форум-�
 
 - Docker Engine и Docker Compose v2 — рекомендуемый способ запуска;
 - публичный HTTPS-домен, ведущий на порт `8000` приложения;
+- локальная сборка PDF.js в `static/pdfjs` (не хранится в Git; инструкция ниже);
 - Telegram-бот, созданный через [@BotFather](https://t.me/BotFather);
 - `api_id` и `api_hash` приложения Telegram из [my.telegram.org](https://my.telegram.org/apps);
 - форум-супергруппа Telegram с включёнными топиками.
 
 Бота необходимо добавить в форум-группу администратором. Это требуется для чтения истории сообщений и списка участников при обновлении коллекции.
+
+## PDF.js
+
+Веб-читалка использует статическую сборку [Mozilla PDF.js 6.1.200](https://github.com/mozilla/pdf.js/releases/tag/v6.1.200). Она намеренно исключена из Git через правило `/static/pdfjs` в `.gitignore`, поэтому должна быть скачана **до** сборки Docker-образа или запуска приложения.
+
+Скачайте архив дистрибутива и распакуйте его в `static/pdfjs`:
+
+```bash
+mkdir -p static/pdfjs
+curl -fL -o /tmp/pdfjs-6.1.200-dist.zip \
+  https://github.com/mozilla/pdf.js/releases/download/v6.1.200/pdfjs-6.1.200-dist.zip
+unzip -q /tmp/pdfjs-6.1.200-dist.zip -d static/pdfjs
+test -f static/pdfjs/web/viewer.html
+```
+
+После распаковки должны существовать как минимум `static/pdfjs/web/viewer.html` и `static/pdfjs/build/`. FastAPI публикует этот каталог по пути `/pdfjs`, а клиентская часть открывает `/pdfjs/web/viewer.html` во фрейме.
+
+Версия PDF.js зафиксирована в этой инструкции, чтобы сборка была воспроизводимой. При обновлении библиотеки обновите версию в README и проверьте открытие PDF в Telegram Web App.
 
 ## Быстрый запуск в Docker
 
