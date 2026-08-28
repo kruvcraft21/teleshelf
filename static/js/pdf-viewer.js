@@ -8,6 +8,14 @@ const check = document.getElementById("check");
 const session_id = frame.dataset.session_id
 const current_page = frame.dataset.page
 const assetsVersion = frame.dataset.assetsVersion;
+let toolbarStylesLoaded = false;
+let viewerInitialized = false;
+
+function showViewerWhenReady() {
+    if (!toolbarStylesLoaded || !viewerInitialized) return;
+
+    frame.classList.add("toolbar-ready");
+}
 
 function updatePdfSafeArea() {
     const contentTop = getComputedStyle(document.documentElement)
@@ -61,12 +69,19 @@ frame.onload = () => {
         const linkTag = iframeDoc.createElement('link');
         linkTag.rel = 'stylesheet';
         linkTag.href = `/css/toolbar.css?v=${encodeURIComponent(assetsVersion)}`;
+        linkTag.onload = () => {
+            toolbarStylesLoaded = true;
+            showViewerWhenReady();
+        };
+        linkTag.onerror = () => setError("Не удалось загрузить стили просмотрщика");
         iframeDoc.head.appendChild(linkTag);
         updatePdfSafeArea();
         const viewerApp = frame.contentWindow.PDFViewerApplication;
         if (viewerApp) {
             setLoading("Открытие документа...");
             viewerApp.initializedPromise.then(() => {
+                viewerInitialized = true;
+                showViewerWhenReady();
                 viewerApp.eventBus.on("pagesinit", () => {
                     setReady("Документ открыт");
                 });
