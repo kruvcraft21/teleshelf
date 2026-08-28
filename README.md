@@ -1,34 +1,34 @@
-# Telega Reader
+# TeleShelf
 
-Telegram-бот для библиотеки документов в форум-группах. Администратор обновляет индекс файлов из топиков, а участники открывают их во встроенной веб-читалке и продолжают чтение с сохранённой страницы.
+TeleShelf indexes documents from Telegram forum topics and gives chat members a personal web reader. Reading progress is saved, so a document reopens at the last viewed page.
 
-Проект состоит из одного Python-приложения: оно запускает Telegram-бота и FastAPI-сервис читалки. Для хранения используются PostgreSQL и Redis.
+The project is a single Python application that runs both the Telegram bot and the FastAPI reader service. PostgreSQL stores the catalogue and persistent reading positions; Redis stores reader sessions and temporary state.
 
-## Возможности
+## Features
 
-- индексация документов из топиков Telegram-форума;
-- доступ к коллекции только для участников соответствующего чата;
-- список топиков и файлов с пагинацией;
-- потоковая передача PDF из Telegram без отдельного файлового хранилища;
-- сохранение позиции чтения в Redis и периодическая запись в PostgreSQL;
-- запуск и миграции через Docker Compose.
+- indexes documents from Telegram forum topics;
+- limits catalogue access to members of the source chat;
+- paginated topic and file selection in the bot;
+- streams PDFs directly from Telegram, with no separate file storage;
+- saves reading progress in Redis and periodically persists it to PostgreSQL;
+- Docker Compose deployment with automatic database migrations.
 
-## Требования
+## Requirements
 
-- Docker Engine и Docker Compose v2 — рекомендуемый способ запуска;
-- публичный HTTPS-домен, ведущий на порт `8000` приложения;
-- локальная сборка PDF.js в `static/pdfjs` (не хранится в Git; инструкция ниже);
-- Telegram-бот, созданный через [@BotFather](https://t.me/BotFather);
-- `api_id` и `api_hash` приложения Telegram из [my.telegram.org](https://my.telegram.org/apps);
-- форум-супергруппа Telegram с включёнными топиками.
+- Docker Engine and Docker Compose v2 (recommended);
+- a public HTTPS domain that routes to port `8000` of the application;
+- a local PDF.js distribution in `static/pdfjs` (it is not committed to Git; see below);
+- a Telegram bot created with [@BotFather](https://t.me/BotFather);
+- a Telegram application `api_id` and `api_hash` from [my.telegram.org](https://my.telegram.org/apps);
+- a Telegram supergroup with forum topics enabled.
 
-Бота необходимо добавить в форум-группу администратором. Это требуется для чтения истории сообщений и списка участников при обновлении коллекции.
+The bot must be made an administrator of the forum group. It needs access to message history and the member list when updating the collection.
 
 ## PDF.js
 
-Веб-читалка использует статическую сборку [Mozilla PDF.js 6.1.200](https://github.com/mozilla/pdf.js/releases/tag/v6.1.200). Она намеренно исключена из Git через правило `/static/pdfjs` в `.gitignore`, поэтому должна быть скачана **до** сборки Docker-образа или запуска приложения.
+The web reader uses the static [Mozilla PDF.js 6.1.200](https://github.com/mozilla/pdf.js/releases/tag/v6.1.200) distribution. The `/static/pdfjs` directory is deliberately ignored by Git, so download it **before** building the Docker image or starting the application.
 
-Скачайте архив дистрибутива и распакуйте его в `static/pdfjs`:
+Download and unpack the distribution into `static/pdfjs`:
 
 ```bash
 mkdir -p static/pdfjs
@@ -38,75 +38,81 @@ unzip -q /tmp/pdfjs-6.1.200-dist.zip -d static/pdfjs
 test -f static/pdfjs/web/viewer.html
 ```
 
-После распаковки должны существовать как минимум `static/pdfjs/web/viewer.html` и `static/pdfjs/build/`. FastAPI публикует этот каталог по пути `/pdfjs`, а клиентская часть открывает `/pdfjs/web/viewer.html` во фрейме.
+The resulting directory must contain at least `static/pdfjs/web/viewer.html` and `static/pdfjs/build/`. FastAPI serves these assets at `/pdfjs`, and the client loads `/pdfjs/web/viewer.html` in an iframe.
 
-Версия PDF.js зафиксирована в этой инструкции, чтобы сборка была воспроизводимой. При обновлении библиотеки обновите версию в README и проверьте открытие PDF в Telegram Web App.
+The version is pinned to keep builds reproducible. When upgrading PDF.js, update this README and verify that a PDF opens correctly in Telegram Web Apps.
 
-## Быстрый запуск в Docker
+## Quick start with Docker
 
-1. Скопируйте шаблон: `cp .env.example .env.docker`, затем заполните секреты. Для контейнеров укажите `POSTGRES_HOST=db` и `REDIS_HOST=redis`.
-2. Убедитесь, что `API_DOMAIN` — публичный адрес сервиса с протоколом, например `https://reader.example.com/`. Этот адрес бот отправляет пользователям.
-3. Соберите и запустите сервисы:
+1. Copy the environment template and replace every placeholder secret. Set `POSTGRES_HOST=db` and `REDIS_HOST=redis` for containers.
+
+   ```bash
+   cp .env.example .env.docker
+   ```
+
+2. Set `API_DOMAIN` to the public reader URL, including the scheme, for example `https://reader.example.com/`. The bot sends this URL to users.
+3. Install PDF.js as described above.
+4. Build and start the services:
 
    ```bash
    docker compose --profile bot up -d --build
    ```
 
-4. Проверьте состояние и логи:
+5. Check the services and application logs:
 
    ```bash
    docker compose --profile bot ps
    docker compose --profile bot logs -f app
    ```
 
-Compose сначала применяет миграции в одноразовом контейнере `migration`, затем запускает `app`. PostgreSQL и Redis сохраняют данные в каталогах `postgres_debug/` и `redis_data/` в корне проекта.
+Compose runs the one-off `migration` container before starting `app`. PostgreSQL and Redis data are kept in `postgres_debug/` and `redis_data/` at the repository root.
 
-Для остановки используйте:
+To stop the stack:
 
 ```bash
 docker compose --profile bot down
 ```
 
-Опциональный Adminer для отладки базы запускается отдельно:
+An optional Adminer instance for database debugging can be started separately:
 
 ```bash
 docker compose --profile dev up -d adminer
 ```
 
-Он будет доступен на `http://localhost:8080`.
+It is available at `http://localhost:8080`.
 
-## Переменные окружения
+## Configuration
 
-| Переменная | Описание | Значение по умолчанию |
+| Variable | Description | Default |
 | --- | --- | --- |
-| `BOT_TOKEN` | токен бота от BotFather | — |
-| `TELEGRAM_API_ID` | идентификатор Telegram-приложения | `0` |
-| `TELEGRAM_API_HASH` | хеш Telegram-приложения | — |
-| `API_DOMAIN` | внешний URL веб-читалки, включая `https://` | — |
-| `POSTGRES_HOST` | хост PostgreSQL (`db` в Docker) | — |
-| `POSTGRES_PORT` | порт PostgreSQL | `5432` |
-| `POSTGRES_DB` | имя базы данных | — |
-| `POSTGRES_USER` | пользователь базы данных | — |
-| `POSTGRES_PASSWORD` | пароль базы данных | — |
-| `POSTGRES_POOL_SIZE` | размер пула подключений SQLAlchemy | `10` |
-| `POSTGRES_MAX_OVERFLOW` | дополнительное число подключений | `20` |
-| `REDIS_HOST` | хост Redis (`redis` в Docker) | — |
-| `REDIS_PORT` | порт Redis | `6379` |
-| `REDIS_DB` | номер базы Redis | `0` |
-| `REDIS_SESSION_TTL` | TTL сессии читалки в секундах | `3600` |
-| `REDIS_MAX_CONNECTIONS` | лимит подключений к Redis | `10` |
-| `FSM_DATA_TTL_SECONDS` | время хранения данных FSM бота | `1800` |
-| `FSM_STATE_TTL_SECONDS` | время хранения состояния FSM бота | `1800` |
-| `TRANSFER_JOB_INTERVAL_MINUTES` | интервал записи позиций из Redis в PostgreSQL | `2` |
-| `TRANSFER_JOB_SCHEDULER_MAX_INSTANCES` | максимум параллельных задач синхронизации | `1` |
-| `LOG_LEVEL` | уровень логирования | — |
-| `LOG_FORMAT` | формат сообщений Python logging | — |
+| `BOT_TOKEN` | BotFather token for the Telegram bot | — |
+| `TELEGRAM_API_ID` | Telegram application ID | `0` |
+| `TELEGRAM_API_HASH` | Telegram application hash | — |
+| `API_DOMAIN` | Public reader URL, including `https://` | — |
+| `POSTGRES_HOST` | PostgreSQL host (`db` in Docker) | — |
+| `POSTGRES_PORT` | PostgreSQL port | `5432` |
+| `POSTGRES_DB` | PostgreSQL database name | — |
+| `POSTGRES_USER` | PostgreSQL user | — |
+| `POSTGRES_PASSWORD` | PostgreSQL password | — |
+| `POSTGRES_POOL_SIZE` | SQLAlchemy connection pool size | `10` |
+| `POSTGRES_MAX_OVERFLOW` | Extra SQLAlchemy connections permitted | `20` |
+| `REDIS_HOST` | Redis host (`redis` in Docker) | — |
+| `REDIS_PORT` | Redis port | `6379` |
+| `REDIS_DB` | Redis database number | `0` |
+| `REDIS_SESSION_TTL` | Reader session TTL in seconds | `3600` |
+| `REDIS_MAX_CONNECTIONS` | Redis connection limit | `10` |
+| `FSM_DATA_TTL_SECONDS` | Bot FSM data lifetime | `1800` |
+| `FSM_STATE_TTL_SECONDS` | Bot FSM state lifetime | `1800` |
+| `TRANSFER_JOB_INTERVAL_MINUTES` | Interval for persisting positions from Redis | `2` |
+| `TRANSFER_JOB_SCHEDULER_MAX_INSTANCES` | Maximum concurrent persistence jobs | `1` |
+| `LOG_LEVEL` | Python logging level | — |
+| `LOG_FORMAT` | Python logging format | — |
 
-Не добавляйте файлы окружения и токены в репозиторий. Для локального запуска приложение читает `.env`, Docker Compose передаёт настройки приложению из `.env.docker`.
+Never commit environment files or secrets. The local application reads `.env`; Docker Compose passes application settings from `.env.docker`.
 
-## Локальный запуск
+## Local development
 
-Поднимите PostgreSQL и Redis любым удобным способом, затем создайте `.env` из шаблона и заполните секреты (для локальных сервисов в шаблоне уже указаны `POSTGRES_HOST=localhost` и `REDIS_HOST=localhost`).
+Start PostgreSQL and Redis by any preferred method, then create `.env` from the template and fill in the secrets. The template already uses `localhost` for the local database and Redis hosts.
 
 ```bash
 cp .env.example .env
@@ -117,30 +123,30 @@ alembic upgrade head
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-После запуска главная страница читалки доступна по адресу `http://localhost:8000/`. Полезная диагностика FastAPI также доступна на `http://localhost:8000/docs`.
+The reader home page is available at `http://localhost:8000/`; FastAPI's interactive API documentation is available at `http://localhost:8000/docs`.
 
-## Работа с ботом
+## Using the bot
 
-1. Добавьте в форум-группу документы PDF: один или несколько файлов в каждый тематический топик.
-2. Отправьте в этой группе `/update`. Команду должен отправлять пользователь, а бот должен быть администратором.
-3. Бот считывает сообщения от начала истории до сообщения с `/update`, обновляет список топиков, файлов и участников группы.
-4. Участник запускает бота командой `/start`, выбирает топик и документ, затем открывает кнопку со ссылкой на читалку.
+1. Add PDF documents to one or more topics in the forum group.
+2. Send `/update` in that group. The bot must be an administrator.
+3. The bot reads messages from the beginning of the chat through the `/update` message, then updates topics, files, and group members.
+4. A group member sends `/start` to the bot, selects a topic and document, and opens the reader link.
 
-При изменении состава участников или файлов снова выполните `/update`. Для полноты индексации отправляйте команду после всех документов, которые должны попасть в коллекцию.
+Run `/update` again whenever files or chat membership change. Send the command after all documents that must be included, otherwise newer messages will not be indexed.
 
-## HTTP-маршруты
+## HTTP routes
 
-| Маршрут | Назначение |
+| Route | Purpose |
 | --- | --- |
-| `GET /?session_id=…` | страница веб-читалки; необязательный `mode=fullscreen` включает полноэкранный режим |
-| `GET /api/pdf/{session_id}` | поток PDF-документа из Telegram |
-| `POST /api/pdf/update_position/{session_id}` | сохраняет страницу; JSON-тело: `{"page": 12}` |
+| `GET /?session_id=…` | Reader page; add `mode=fullscreen` for fullscreen mode |
+| `GET /api/pdf/{session_id}` | Streams a PDF document from Telegram |
+| `POST /api/pdf/update_position/{session_id}` | Saves the page number; JSON body: `{"page": 12}` |
 
-Сессии создаются ботом и имеют ограниченный срок жизни (`REDIS_SESSION_TTL`). Не публикуйте ссылки на документы в открытом доступе.
+The bot creates reader sessions, which expire after `REDIS_SESSION_TTL`. Do not publish document links publicly.
 
-## Миграции базы
+## Database migrations
 
-Миграции хранятся в `database/migrations`. В Docker они применяются автоматически. Для ручного применения:
+Migrations are in `database/migrations` and run automatically in Docker. To apply them manually:
 
 ```bash
 alembic upgrade head
