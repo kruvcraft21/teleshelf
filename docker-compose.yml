@@ -2,6 +2,9 @@ services:
   db:
     image: postgres:18.4-trixie
     restart: always
+    profiles:
+      - db
+      - bot
     volumes:
       - ./postgres_debug:/var/lib/postgresql
     environment:
@@ -9,17 +12,55 @@ services:
       POSTGRES_USER: "${POSTGRES_USER}"
     ports:
       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   adminer:
+    profiles:
+      - dev
     image: adminer:5.4.2-standalone
     restart: always
     ports:
       - "8080:8080"
 
   redis:
+    profiles:
+      - db
+      - bot
     image: redis:8.8.0-trixie
     restart: always
     volumes:
       - ./redis_data:/data
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
+
+  migration:
+    image: reader_bot:latest
+    profiles:
+      - bot
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    command: ["alembic", "upgrade", "head"]
+
+  app:
+    profiles:
+      - bot
+    image: reader_bot:latest
+    build: .
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    env_file:
+      - .env.docker
+    ports:
+      - "8000:8000"
