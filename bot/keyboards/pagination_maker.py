@@ -6,6 +6,7 @@ from aiogram.types import (
     WebAppInfo,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from yarl import URL
 
 from bot.callbacks import PaginationButton
 
@@ -74,12 +75,14 @@ def _catalog_maker(
         )
     return builder.as_markup()
 
+
 def topic_keyboard(chats: dict[str, int], page: int) -> InlineKeyboardMarkup:
     return _catalog_maker(
         items=list(chats.keys()),
         page=page,
         item_action="topic",
     )
+
 
 def file_keyboard(files: dict[str, int], page: int) -> InlineKeyboardMarkup:
     return _catalog_maker(
@@ -89,11 +92,18 @@ def file_keyboard(files: dict[str, int], page: int) -> InlineKeyboardMarkup:
         back_action="back_to_topics",
     )
 
-def document_keyboard(url: str, page: int) -> InlineKeyboardMarkup:
+
+def document_keyboard(url: URL, page: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
-            text="Ссылка на документ", web_app=WebAppInfo(url=url)
+            text="Ссылка на документ", web_app=WebAppInfo(url=str(url))
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="Ссылка на документ, на весь экран",
+            web_app=WebAppInfo(url=str(url.update_query(mode="fullscreen"))),
         )
     )
     builder.row(

@@ -1,8 +1,8 @@
 import logging
-import os
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import APIRouter, Body, FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -19,7 +19,6 @@ config = load_config()
 logger = logging.getLogger(__name__)
 
 
-
 # FastAPI приложение
 reader = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -29,7 +28,12 @@ reader.mount("/pdfjs", StaticFiles(directory="static/pdfjs"), name="pdfjs")
 
 
 @reader.get("/", response_class=HTMLResponse)
-async def reader_page(request: Request, redis_session: Redis, session_id: str = ""):
+async def reader_page(
+    request: Request,
+    redis_session: Redis,
+    session_id: str = "",
+    mode: Literal["fullscreen", "normal"] = "normal",
+):
     """Страница читалки"""
     headers = {
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -49,6 +53,7 @@ async def reader_page(request: Request, redis_session: Redis, session_id: str = 
             "ver": str(uuid.uuid4()),
             "level_debug": config.log.level,
             "page": page,
+            "reader_mode": mode,
         },
         headers=headers,
     )

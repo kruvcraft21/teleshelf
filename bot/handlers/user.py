@@ -125,7 +125,7 @@ async def choose_file(
         files_list = list(files.items())
         file_name, file_id = files_list[callback_data.index]
         session = await session_manager.create(file_id, callback_query.from_user.id)
-        document_url = str(URL(config.api.api_domain).update_query(session_id=session))
+        document_url = URL(config.api.api_domain).update_query(session_id=session)
         await callback_query.message.edit_text(
             f"Вот ваш документ: {file_name}",
             reply_markup=document_keyboard(document_url, 1),

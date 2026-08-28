@@ -1,4 +1,5 @@
 const tg = window.Telegram?.WebApp;
+const workerTag = document.getElementById('webapp-worker');
 
 function updateContentSafeArea() {
     const top = tg?.contentSafeAreaInset?.top ?? 0;
@@ -18,5 +19,7 @@ if (tg) {
 if (tg && tg.initData) {
     tg.ready();
     tg.expand();
-    tg.requestFullscreen();
+    if (workerTag && workerTag.dataset.readerMode === "fullscreen") {
+        tg.requestFullscreen();
+    }
 }

@@ -9,7 +9,10 @@
     <link rel="stylesheet" href="{{ request.app.url_path_for("css", path="status-bar.css") }}?v={{ ver }}">
     <link rel="stylesheet" href="{{ request.app.url_path_for("css", path="pdf-frame.css") }}?v={{ ver }}">
     <link rel="preload" as="style" href="{{ request.app.url_path_for("css", path="toolbar.css") }}?v={{ ver }}">
-    <script src="{{ request.app.url_path_for("js", path="webapp-worker.js") }}?v={{ ver }}"></script>
+    <script src="{{ request.app.url_path_for("js", path="webapp-worker.js") }}?v={{ ver }}"
+            id="webapp-worker"
+            data-reader-mode="{{ reader_mode }}"
+    ></script>
 </head>
 
 <body>
