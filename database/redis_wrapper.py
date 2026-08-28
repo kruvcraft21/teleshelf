@@ -11,21 +11,21 @@ logger = logging.getLogger(__name__)
 
 
 class RedisSessionStore:
-    SESSION_TTL = 60 * 60
 
-    def __init__(self, redis_client: Redis):
+    def __init__(self, redis_client: Redis, session_ttl: int = 60 * 60):
         self._redis = redis_client
+        self.SESSION_TTL = session_ttl
 
     @classmethod
-    def from_settings(cls, settings: RedisSettings, db: int = 0) -> "RedisSessionStore":
+    def from_settings(cls, settings: RedisSettings, db: int) -> "RedisSessionStore":
         redis_client = Redis(
             host=settings.host,
             port=settings.port,
             decode_responses=True,
-            max_connections=10,
-            db=db,
+            max_connections=settings.max_connections,
+            db=db or settings.db,
         )
-        return cls(redis_client)
+        return cls(redis_client, settings.session_ttl)
 
     @property
     def client(self) -> Redis:

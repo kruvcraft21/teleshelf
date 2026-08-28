@@ -19,6 +19,8 @@ class PGDatabseSettings:
     database: str
     username: str
     password: str
+    pool_size: int
+    max_overflow: int
 
 
 @dataclass
@@ -28,10 +30,24 @@ class TgApiServer:
 
 
 @dataclass
+class FSMSettings:
+    data_ttl: int
+    state_ttl: int
+
+
+@dataclass
 class RedisSettings:
     host: str
     port: int
+    session_ttl: int
+    db: int
+    max_connections: int
 
+
+@dataclass
+class TransferJobSettings:
+    interval_minutes: int
+    scheduler_max_instances: int
 
 @dataclass
 class ApiSettings:
@@ -46,3 +62,5 @@ class Config:
     tg_api: TgApiServer
     redis: RedisSettings
     api: ApiSettings
+    fsm: FSMSettings
+    transfer_job: TransferJobSettings

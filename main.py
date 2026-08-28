@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 logger.info(f"BASE_DIR: {BASE_DIR}")
 
+
 async def start_app() -> AppContext:
     # Выводим в консоль информацию о начале запуска бота
     logger.info("Starting bot")
@@ -36,11 +37,15 @@ async def start_app() -> AppContext:
     bot = Bot(
         token=config.bot.token,
     )
-    redis = RedisSessionStore.from_settings(config.redis)
+    redis = RedisSessionStore.from_settings(config.redis, db=config.redis.db)
     db = await PostgresStorage.create(config.database)
     reader_session = ReaderSession(db, redis)
 
-    dp = Dispatcher(storage=RedisStorage(redis.client, data_ttl=1800, state_ttl=1800))
+    dp = Dispatcher(
+        storage=RedisStorage(
+            redis.client, data_ttl=config.fsm.data_ttl, state_ttl=config.fsm.state_ttl
+        )
+    )
     dp.include_router(chats_router)
     dp.include_router(user_router)
     if config.log.level in ["DEBUG", "INFO"]:
@@ -61,8 +66,8 @@ async def start_app() -> AppContext:
     scheduler.add_job(
         transfer_job.__call__,
         trigger="interval",
-        minutes=2,
-        max_instances=1,
+        minutes=config.transfer_job.interval_minutes,
+        max_instances=config.transfer_job.scheduler_max_instances,
         next_run_time=datetime.now(timezone.utc),
     )
     scheduler.add_listener(

@@ -50,8 +50,8 @@ class PostgresStorage:
         _engine = create_async_engine(
             database_url,
             echo=False,
-            pool_size=10,
-            max_overflow=20,
+            pool_size=db_settings.pool_size,
+            max_overflow=db_settings.max_overflow,
         )
         _session = async_sessionmaker(
             bind=_engine,
