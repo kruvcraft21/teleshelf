@@ -55,7 +55,7 @@ The version is pinned to keep builds reproducible. When upgrading PDF.js, update
 4. Build and start the services:
 
    ```bash
-   docker compose --profile bot up -d --build
+   docker compose --env-file .env.docker --profile bot up -d --build
    ```
 
 5. Check the services and application logs:
