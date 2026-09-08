@@ -3,8 +3,9 @@ import logging
 
 from aiogram import F, Router
 from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter, Command
-from aiogram.types import BotCommand, ChatMemberUpdated, Message
+from aiogram.types import ChatMemberUpdated, Message
 
+from bot.keyboards.model_commands import BotCommand
 from clients.hydroclient import HydroClient
 from database.postgres import PostgresStorage
 
@@ -20,12 +21,7 @@ async def info(message: Message):
 
 
 @chats_router.message(
-    Command(
-        BotCommand(
-            command="update",
-            description="Обновить документы (Работает только в форумах)",
-        )
-    ),
+    Command(BotCommand.UPDATE),
     F.from_user,
     F.chat.is_forum,
 )

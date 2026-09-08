@@ -5,7 +5,6 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state
 from aiogram.types import (
-    BotCommand,
     CallbackQuery,
     InaccessibleMessage,
     Message,
@@ -15,6 +14,7 @@ from aiogram.types import (
 from yarl import URL
 
 from bot.callbacks import PaginationButton, ReaderState
+from bot.keyboards.model_commands import BotCommand as bc
 from bot.keyboards.pagination_maker import (
     document_keyboard,
     file_keyboard,
@@ -30,9 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 @user_router.message(
-    Command(
-        BotCommand(command="start", description="Получить список доступных топиков")
-    ),
+    Command(commands=bc.START),
     F.from_user,
 )
 async def start(message: Message, db: PostgresStorage, state: FSMContext):

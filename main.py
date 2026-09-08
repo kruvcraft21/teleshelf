@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from bot.handlers.chats import chats_router
 from bot.handlers.other import other_router
 from bot.handlers.user import user_router
+from bot.keyboards.menu_commands import set_menu_commands
 from clients import HydroClient
 from config import load_config
 from config.logging import config_logger
@@ -48,6 +49,7 @@ async def start_app() -> AppContext:
     )
     dp.include_router(chats_router)
     dp.include_router(user_router)
+    await set_menu_commands(bot)
     if config.log.level in ["DEBUG", "INFO"]:
         dp.include_router(other_router)
 
