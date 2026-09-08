@@ -263,3 +263,8 @@ cython_debug/
 *.session
 *.session-shm
 *.session-wal
+
+.env.docker
+
+data/
+letsencrypt/
