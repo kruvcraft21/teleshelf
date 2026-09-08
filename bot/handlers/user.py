@@ -1,10 +1,11 @@
 import logging
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart, StateFilter
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state
 from aiogram.types import (
+    BotCommand,
     CallbackQuery,
     InaccessibleMessage,
     Message,
@@ -28,7 +29,12 @@ user_router = Router()
 logger = logging.getLogger(__name__)
 
 
-@user_router.message(CommandStart(), F.from_user)
+@user_router.message(
+    Command(
+        BotCommand(command="start", description="Получить список доступных топиков")
+    ),
+    F.from_user,
+)
 async def start(message: Message, db: PostgresStorage, state: FSMContext):
     # pyrefly: ignore [bad-assignment]
     user: User = message.from_user
