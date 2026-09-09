@@ -254,3 +254,5 @@ cython_debug/
 
 data/
 letsencrypt/
+
+*.sql
