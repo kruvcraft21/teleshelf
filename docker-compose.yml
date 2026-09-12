@@ -65,8 +65,6 @@ services:
       - bot
     image: 'jc21/nginx-proxy-manager:2.15.1'
     restart: unless-stopped
-    environment:
-      TZ: "Asia/Yekaterinburg"
     ports:
       - '80:80'
       - '81:81'
