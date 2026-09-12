@@ -2,9 +2,6 @@ services:
   db:
     image: postgres:18.4-trixie
     restart: always
-    profiles:
-      - db
-      - bot
     volumes:
       - ./postgres_debug:/var/lib/postgresql
     environment:
@@ -12,7 +9,7 @@ services:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_DB: "${POSTGRES_DB}"
     ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 5s
@@ -28,15 +25,12 @@ services:
       - "8080:8080"
 
   redis:
-    profiles:
-      - db
-      - bot
     image: redis:8.8.0-trixie
     restart: always
     volumes:
       - ./redis_data:/data
     ports:
-      - "${REDIS_PORT}:${REDIS_PORT}"
+      - "127.0.0.1:${REDIS_PORT}:6379"
 
   migration:
     image: reader_bot:latest
@@ -64,7 +58,7 @@ services:
     env_file:
       - .env.docker
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   npm:
     profiles:
