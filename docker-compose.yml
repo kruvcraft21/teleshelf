@@ -62,7 +62,7 @@ services:
 
   npm:
     profiles:
-      - dev
+      - bot
     image: 'jc21/nginx-proxy-manager:2.15.1'
     restart: unless-stopped
     environment:
