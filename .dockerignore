@@ -270,3 +270,5 @@ data/
 letsencrypt/
 
 *.sql
+
+.env*
