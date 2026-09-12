@@ -10,6 +10,7 @@ BATCH_SIZE = 100
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class File:
     message_id: int
@@ -78,4 +79,7 @@ class HydroClient(Client):
 
     async def is_admin(self, chat_id: int) -> bool:
         user = await self.get_chat_member(chat_id, "me")
-        return user.status == ChatMemberStatus.ADMINISTRATOR or user.status == ChatMemberStatus.OWNER
+        return (
+            user.status == ChatMemberStatus.ADMINISTRATOR
+            or user.status == ChatMemberStatus.OWNER
+        )

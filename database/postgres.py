@@ -231,9 +231,7 @@ class PostgresStorage:
     async def try_add_positions(self, positions: list[dict]):
         positions_columns = tuple(Position.__table__.columns)
         redis_positions = (
-            values(
-                *positions_columns
-            )
+            values(*positions_columns)
             .data(
                 [
                     (position["user_id"], position["file_id"], position["page"])
@@ -242,8 +240,8 @@ class PostgresStorage:
             )
             .alias("redis_positions")
         )
-        exist_file_positions = (
-            select(redis_positions).join(File, File.id == redis_positions.c.file_id)
+        exist_file_positions = select(redis_positions).join(
+            File, File.id == redis_positions.c.file_id
         )
         stmt = insert(Position).from_select(positions_columns, exist_file_positions)
         stmt = stmt.on_conflict_do_update(

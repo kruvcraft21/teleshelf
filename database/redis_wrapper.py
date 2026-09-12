@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class RedisSessionStore:
-
     def __init__(self, redis_client: Redis, session_ttl: int = 60 * 60):
         self._redis = redis_client
         self.SESSION_TTL = session_ttl

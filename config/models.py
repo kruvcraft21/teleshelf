@@ -49,6 +49,7 @@ class TransferJobSettings:
     interval_minutes: int
     scheduler_max_instances: int
 
+
 @dataclass
 class ApiSettings:
     api_domain: str

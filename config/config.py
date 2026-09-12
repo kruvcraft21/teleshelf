@@ -30,7 +30,7 @@ def load_config(path: str | None = None) -> Config:
             username=os.getenv("POSTGRES_USER", ""),
             password=os.getenv("POSTGRES_PASSWORD", ""),
             pool_size=int(os.getenv("POSTGRES_POOL_SIZE", "10")),
-            max_overflow=int(os.getenv("POSTGRES_MAX_OVERFLOW", "20"))
+            max_overflow=int(os.getenv("POSTGRES_MAX_OVERFLOW", "20")),
         ),
         tg_api=TgApiServer(
             api_id=int(os.getenv("TELEGRAM_API_ID", "0")),
@@ -52,6 +52,8 @@ def load_config(path: str | None = None) -> Config:
         ),
         transfer_job=TransferJobSettings(
             interval_minutes=int(os.getenv("TRANSFER_JOB_INTERVAL_MINUTES", "2")),
-            scheduler_max_instances=int(os.getenv("TRANSFER_JOB_SCHEDULER_MAX_INSTANCES", "1")),
-        )
+            scheduler_max_instances=int(
+                os.getenv("TRANSFER_JOB_SCHEDULER_MAX_INSTANCES", "1")
+            ),
+        ),
     )
