@@ -56,6 +56,28 @@ function setError(text) {
 
 setLoading("Загрузка PDF-просмотрщика...");
 
+// Подключаемся до запуска pdf.js, чтобы получить первые события загрузки.
+document.addEventListener("webviewerloaded", (event) => {
+    if (event.detail?.source !== frame.contentWindow) return;
+
+    const viewerApp = frame.contentWindow.PDFViewerApplication;
+    const open = viewerApp.open;
+    viewerApp.open = function (...args) {
+        const result = open.apply(this, args);
+        const loadingTask = this.pdfLoadingTask;
+        if (loadingTask?.onProgress) {
+            const originalOnProgress = loadingTask.onProgress;
+            loadingTask.onProgress = (progress) => {
+                originalOnProgress(progress);
+                if (spinner.style.display === "block" && Number.isFinite(progress.loaded)) {
+                    setLoading(`Загружено ${(progress.loaded / 1_000_000).toFixed(2)} МБ`);
+                }
+            };
+        }
+        return result;
+    };
+});
+
 // Корректный путь с учетом статики FastAPI
 const pdfUrl = `/api/pdf/${session_id}`;
 const path_to_file = session_id.length > 0 ? `file=${encodeURIComponent(pdfUrl)}#page=${current_page}` : "";
