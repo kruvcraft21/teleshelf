@@ -15,12 +15,17 @@
 
 /* Telegram Mini App: browser-level actions are unavailable or unnecessary. */
 #viewsManagerToggleButton,
+#viewsManager,
 #printButton,
 #downloadButton,
 #secondaryPrint,
 #secondaryDownload,
 #secondaryOpenFile {
     display: none !important;
+}
+
+#outerContainer.viewsManagerOpen #viewerContainer {
+    inset-inline-start: 0 !important;
 }
 
 /* Hide the layout elements that only separated the removed controls. */
